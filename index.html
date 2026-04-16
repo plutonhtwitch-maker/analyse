@@ -414,12 +414,29 @@
                     interaction: { mode: 'index', intersect: false },
                     plugins: { legend: { labels: { color: '#fff' } } },
                     scales: {
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8e8e93' } },
-                        x: { grid: { display: false }, ticks: { color: '#fff', font:{weight:'bold'} } }
+                        y: { 
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: { color: 'rgba(255,255,255,0.05)' }, 
+                            ticks: { color: '#9146FF', font: { weight: 'bold' } } 
+                        },
+                        y1: { 
+                            type: 'linear',
+                            display: mB !== "none",
+                            position: 'right',
+                            grid: { drawOnChartArea: false }, // Évite que la grille verte ne croise la violette
+                            ticks: { color: '#00ffa3', font: { weight: 'bold' } } 
+                        },
+                        x: { 
+                            grid: { display: false }, 
+                            ticks: { color: '#fff', font:{weight:'bold'} } 
+                        }
                     }
                 }
             });
         }
+
 
         function renderCorrelation(data) {
             const target = document.getElementById('metricA').value;
