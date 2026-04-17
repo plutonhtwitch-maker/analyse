@@ -127,13 +127,17 @@
                     <option value="30">SMA 30J</option>
                 </select>
             </div>
-        </div>
+        </div> <!-- C'EST CETTE BALISE QUI AVAIT DISPARU ! -->
+
+        <!-- Notre zone de texte descriptive -->
+        <div id="metricDesc" style="text-align: right; color: var(--text-dim); font-size: 0.75rem; margin-top: 10px; margin-bottom: 15px; padding-right: 5px; font-style: italic;"></div>
 
         <div class="dashboard-grid">
             <div class="card" id="kpi-1"></div>
             <div class="card" id="kpi-2"></div>
             <div class="card" id="kpi-3"></div>
             <div class="card" id="kpi-4"></div>
+
 
             <div class="card span-3 row-2">
                 <div class="chart-header"><div class="chart-title">🌀 ANALYSE COMPARATIVE TEMPORELLE</div></div>
@@ -145,6 +149,15 @@
                 <div style="height:220px;"><canvas id="revenuePie"></canvas></div>
                 <div id="revenueTotal" style="text-align:center; margin-top:15px; font-family:'Orbitron'; font-size:1.1rem; color:var(--accent-green)"></div>
             </div>
+
+            <div class="card span-2">
+                <div class="chart-header">
+                  <div class="chart-title">📊 PERFORMANCE PAR JOUR (MOY.)</div>
+                </div>
+                <div class="chart-wrap"><canvas id="dayChart"></canvas></div>
+            </div>
+
+            <div class="card span-2"><div class="chart-header"><div class="chart-title">🧬 MATRICE DE CORRÉLATION</div></div><div id="correlationMatrix"></div></div>
 
             <div class="card span-2 row-2">
                 <div class="chart-header">
@@ -162,8 +175,8 @@
                 <div id="aiInsights" style="font-size:0.85rem; line-height:1.4; max-height:280px; overflow-y:auto; padding-right:10px;"><p style="color:var(--text-dim); text-align:center; padding-top:100px;">Prêt à analyser vos performances...</p></div>
             </div>
 
-            <div class="card span-2"><div class="chart-header"><div class="chart-title">🔥 DENSITÉ PAR JOUR</div></div><div id="heatmap"></div></div>
-            <div class="card span-2"><div class="chart-header"><div class="chart-title">🧬 MATRICE DE CORRÉLATION</div></div><div id="correlationMatrix"></div></div>
+
+
         </div>
     </div>
 </div>
@@ -175,23 +188,26 @@
     let charts = {};
 
     const METRICS_DICT = {
-        "Spectateurs en moyenne": { label: "Spectateurs Moyens", isAverage: true },
-        "Minutes passées en stream": { label: "Durée du Live", isAverage: false },
-        "Spectateurs max.": { label: "Pic de Viewers", isAverage: true },
-        "Spectateurs uniques": { label: "Viewers Uniques", isAverage: false },
-        "Nouveaux followers": { label: "Followers", isAverage: false },
-        "Cumul followers": { label: "Followers Cumulés", isAverage: false },
-        "Minutes regardées": { label: "Minutes Regardées", isAverage: false },
-        "Personnes sur le chat": { label: "Chatteurs Uniques", isAverage: false },
-        "Nouveaux subs": { label: "Nouveaux Subs", isAverage: false },
-        "Subs actifs": { label: "Subs Actifs", isAverage: false },
-        "_revTotal": { label: "Revenus Totaux ($)", isAverage: false },
-        "_stickiness": { label: "Rétention Moyenne (Min)", isAverage: true, calc: r => r["Spectateurs uniques"] > 0 ? r["Minutes regardées"] / r["Spectateurs uniques"] : 0 },
-        "_convRate": { label: "Taux Conversion Follow (%)", isAverage: true, calc: r => r["Spectateurs uniques"] > 0 ? (r["Nouveaux followers"] / r["Spectateurs uniques"]) * 100 : 0 },
-        "_hypeEfficiency": { label: "Efficacité Hype (Max/Moy)", isAverage: true, calc: r => r["Spectateurs en moyenne"] > 0 ? r["Spectateurs max."] / r["Spectateurs en moyenne"] : 1 },
-        "_hourlyEarnings": { label: "Taux Horaire ($/H)", isAverage: true, calc: r => r["Minutes passées en stream"] > 0 ? r._revTotal / (r["Minutes passées en stream"] / 60) : 0 },
-        "_revPerUnique": { label: "Valeur / Unique ($)", isAverage: true, calc: r => r["Spectateurs uniques"] > 0 ? r._revTotal / r["Spectateurs uniques"] : 0 }
+        "Spectateurs en moyenne": { label: "Spectateurs Moyens", isAverage: true, desc: "Nombre moyen de spectateurs connectés simultanément pendant le stream." },
+        "Minutes passées en stream": { label: "Durée du Live", isAverage: false, desc: "Temps total de diffusion de votre stream." },
+        "Spectateurs max.": { label: "Pic de Viewers", isAverage: true, desc: "Audience maximale (pic) atteinte à un instant T pendant le live." },
+        "Spectateurs uniques": { label: "Viewers Uniques", isAverage: false, desc: "Nombre total de personnes différentes ayant ouvert votre stream." },
+        "Nouveaux followers": { label: "Followers", isAverage: false, desc: "Nombre de nouveaux utilisateurs ayant cliqué sur le bouton 'Suivre'." },
+        "Cumul followers": { label: "Followers Cumulés", isAverage: false, desc: "Évolution globale de votre nombre de followers dans le temps." },
+        "Minutes regardées": { label: "Minutes Regardées", isAverage: false, desc: "Cumul du temps de visionnage de l'ensemble de vos spectateurs." },
+        "Personnes sur le chat": { label: "Chatteurs Uniques", isAverage: false, desc: "Nombre de spectateurs uniques ayant envoyé au moins un message." },
+        "Messages / Chatter": { label: "Messages / Chatter", isAverage: true, desc: "Nombre moyen de messages envoyés par chaque personne active sur le chat.", calc: r => r["Personnes sur le chat"] > 0 ? (r["Messages du chat"] / r["Personnes sur le chat"]) : 0 },
+        "Nouveaux subs": { label: "Nouveaux Subs", isAverage: false, desc: "Abonnements payants, offerts ou Prime obtenus sur la journée." },
+        "Subs actifs": { label: "Subs Actifs", isAverage: false, desc: "Estimation des abonnements encore actifs (basée sur les 30 derniers jours glissants)." },
+        "_revTotal": { label: "Revenus Totaux ($)", isAverage: false, desc: "Total cumulé de tous vos revenus Twitch (Subs, Bits, Pubs, Prime, etc.)." },
+        "_stickiness": { label: "Rétention Moyenne (Min)", isAverage: true, desc: "Temps moyen passé par un viewer sur votre stream. Mesure l'engagement.", calc: r => r["Spectateurs uniques"] > 0 ? r["Minutes regardées"] / r["Spectateurs uniques"] : 0 },
+        "_convRate": { label: "Taux Conversion Follow (%)", isAverage: true, desc: "Pourcentage de viewers uniques qui décident de vous follow.", calc: r => r["Spectateurs uniques"] > 0 ? (r["Nouveaux followers"] / r["Spectateurs uniques"]) * 100 : 0 },
+        "Part Anciens Viewers (%)": { label: "Fidélisation (%)", isAverage: true, desc: "Proportion d'habitués par rapport aux nouveaux venus dans le chat.", calc: r => { const totalImpliques = (r["Anciens viewers impliqués"]||0) + (r["Nouveaux viewers impliqués"]||0); return totalImpliques > 0 ? (r["Anciens viewers impliqués"] / totalImpliques) * 100 : 0;} },
+        "_hypeEfficiency": { label: "Efficacité Hype (Max/Moy)", isAverage: true, desc: "Ratio pic/moyenne. Un chiffre élevé indique des pics d'audience intenses (ex: gros raids).", calc: r => r["Spectateurs en moyenne"] > 0 ? r["Spectateurs max."] / r["Spectateurs en moyenne"] : 1 },
+        "_hourlyEarnings": { label: "Taux Horaire ($/H)", isAverage: true, desc: "Estimation des revenus générés pour chaque heure de diffusion.", calc: r => r["Minutes passées en stream"] > 0 ? r._revTotal / (r["Minutes passées en stream"] / 60) : 0 },
+        "_revPerUnique": { label: "Valeur / Unique ($)", isAverage: true, desc: "Revenus moyens générés par chaque spectateur unique passé sur le stream.", calc: r => r["Spectateurs uniques"] > 0 ? r._revTotal / r["Spectateurs uniques"] : 0 }
     };
+
 
     document.getElementById('csvInput').addEventListener('change', (e) => {
         if(!e.target.files.length) return;
@@ -280,13 +296,24 @@ complete: (res) => {
         const filtered = db.filter(d => d._date >= dS && d._date <= dE);
         const prevS = new Date(dS.getTime() - (dE - dS));
         const prevData = db.filter(d => d._date >= prevS && d._date < dS);
+        
         updateKpis(filtered, prevData);
         renderMainChart(filtered);
         renderRevenuePie(filtered);
         renderMonthlyTrend();
         renderCorrelation(filtered);
-        renderHeatmap(filtered);
+        renderDayChart(filtered);;
+
+        // --- NOUVELLES LIGNES A AJOUTER ICI ---
+        const selectedMetric = document.getElementById('metricA').value;
+        const descDiv = document.getElementById('metricDesc');
+        if (METRICS_DICT[selectedMetric] && METRICS_DICT[selectedMetric].desc) {
+            descDiv.innerText = "ℹ️ " + METRICS_DICT[selectedMetric].desc;
+        } else {
+            descDiv.innerText = ""; // On vide si pas de description
+        }
     }
+
 
     function updateKpis(curr, prev) {
         const keys = ["Spectateurs en moyenne", "Nouveaux followers", "_revTotal", "Minutes passées en stream"];
@@ -343,57 +370,152 @@ complete: (res) => {
         charts.monthly = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Actuel', data: currentData, backgroundColor: '#00e5ff', borderRadius: 4 }, { label: 'Année-1', data: prevYearData, backgroundColor: 'rgba(145, 70, 255, 0.4)', borderRadius: 4 }]}, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } } } } });
     }
 
-    function renderRevenuePie(data) {
-        const ctx = document.getElementById('revenuePie').getContext('2d');
-        if(charts.pie) charts.pie.destroy();
-        const sums = { 
-            "Subs (Dir/Prime)": data.reduce((a,b)=>a+(b["Revenu issu des abonnements"]||0)+(b["Revenu Prime"]||0), 0),
-            "Subs Offerts": data.reduce((a,b)=>a+(b["Revenus issus des abonnements offerts"]||0), 0),
-            "Bits": data.reduce((a,b)=>a+(b["Revenu des Bits"]||0), 0),
-            "Publicité": data.reduce((a,b)=>a+(b["Revenu issu de la publicité"]||0), 0)
-        };
-        const total = Object.values(sums).reduce((a,b)=>a+b,0);
-        document.getElementById('revenueTotal').innerText = `TOTAL: ${total.toFixed(2)}$`;
-        charts.pie = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(sums), datasets: [{ data: Object.values(sums), backgroundColor: ['#9146FF', '#bf94ff', '#00ffa3', '#ffd700'], borderWidth: 0, hoverOffset: 15 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color:'#fff', boxWidth: 10, font: { size: 9 } } } }, cutout: '70%' } });
-    }
+   function renderRevenuePie(data) {
+    const ctx = document.getElementById('revenuePie').getContext('2d');
+    if(charts.pie) charts.pie.destroy();
+    
+    const sums = { 
+        "Subs Payés": data.reduce((a,b)=>a+(b["Revenu issu des abonnements"]||0), 0),
+        "Subs Prime": data.reduce((a,b)=>a+(b["Revenu Prime"]||0), 0),
+        "Subs Offerts": data.reduce((a,b)=>a+(b["Revenus issus des abonnements offerts"]||0), 0),
+        "Bits": data.reduce((a,b)=>a+(b["Revenu des Bits"]||0), 0),
+        "Publicité": data.reduce((a,b)=>a+(b["Revenu issu de la publicité"]||0), 0),
+        // Ajout de la catégorie Autres pour combler le trou :
+        "Autres": data.reduce((a,b)=>a+((b["Revenus Turbo"]||0) + (b["Revenu issu des ventes de jeux"]||0) + (b["Revenu des extensions"]||0) + (b["Revenus des offres"]||0) + (b["Autres revenus d'interactions de Bits"]||0)), 0)
+    };
 
-    function renderCorrelation(data) {
-        const target = document.getElementById('metricA').value;
-        const streams = data.filter(d => d["Minutes passées en stream"] > 0);
-        if(streams.length < 3) return;
-        const calcCorr = (x, y) => {
-            const n = x.length; const sX = x.reduce((a,b)=>a+b,0); const sY = y.reduce((a,b)=>a+b,0);
-            const sXY = x.reduce((a,b,i)=>a+b*y[i],0); const sX2 = x.reduce((a,b)=>a+b*b,0); const sY2 = y.reduce((a,b)=>a+b*b,0);
-            const num = n * sXY - sX * sY; const den = Math.sqrt((n * sX2 - sX*sX) * (n * sY2 - sY*sY));
-            return den === 0 ? 0 : num / den;
-        };
-        const targetArr = streams.map(d => d[target]);
-        const html = Object.keys(METRICS_DICT).filter(k => k !== target && !k.startsWith('_')).slice(0, 5).map(k => {
+    
+    const total = Object.values(sums).reduce((a,b)=>a+b,0);
+    document.getElementById('revenueTotal').innerText = `TOTAL: ${total.toFixed(2)}$`;
+    
+    charts.pie = new Chart(ctx, { 
+        type: 'doughnut', 
+        data: { 
+            labels: Object.keys(sums), 
+            datasets: [{ 
+                data: Object.values(sums), 
+                // Ajout d'une 5ème couleur (bleu néon #00e5ff) pour la nouvelle catégorie
+                backgroundColor: ['#9146FF', '#00e5ff', '#bf94ff', '#00ffa3', '#ffd700'], 
+                borderWidth: 0, 
+                hoverOffset: 15 
+            }] 
+        }, 
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { 
+                legend: { position: 'bottom', labels: { color:'#fff', boxWidth: 10, font: { size: 9 } } } 
+            }, 
+            cutout: '70%' 
+        } 
+    });
+}
+
+
+function renderCorrelation(data) {
+    const target = document.getElementById('metricA').value;
+    const streams = data.filter(d => d["Minutes passées en stream"] > 0);
+    if(streams.length < 3) return;
+
+    const calcCorr = (x, y) => {
+        const n = x.length; 
+        const sX = x.reduce((a,b)=>a+b,0); 
+        const sY = y.reduce((a,b)=>a+b,0);
+        const sXY = x.reduce((a,b,i)=>a+b*y[i],0); 
+        const sX2 = x.reduce((a,b)=>a+b*b,0); 
+        const sY2 = y.reduce((a,b)=>a+b*b,0);
+        const num = n * sXY - sX * sY; 
+        const den = Math.sqrt((n * sX2 - sX*sX) * (n * sY2 - sY*sY));
+        return den === 0 ? 0 : num / den;
+    };
+
+    const targetArr = streams.map(d => d[target]);
+
+    // Changement : .slice(0, 10) pour afficher les 10 premières métriques du dictionnaire
+    const html = Object.keys(METRICS_DICT)
+        .filter(k => k !== target && !k.startsWith('_'))
+        .slice(0, 10) 
+        .map(k => {
             const val = calcCorr(targetArr, streams.map(d => d[k]||0));
             const color = val > 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-            return `<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:0.7rem;">
-                <span style="width:100px; color:var(--text-dim)">${METRICS_DICT[k].label}</span>
-                <div style="flex:1; height:4px; background:rgba(255,255,255,0.05); border-radius:2px; overflow:hidden;"><div style="width:${Math.abs(val)*100}%; height:100%; background:${color}"></div></div>
-                <span style="color:${color}; font-weight:bold">${val.toFixed(2)}</span>
-            </div>`;
+            // J'ai un peu augmenté l'espacement (margin-bottom: 12px) et la taille des barres
+            return `
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px; font-size:0.75rem;">
+                    <span style="width:140px; color:var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${METRICS_DICT[k].label}</span>
+                    <div style="flex:1; height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden;">
+                        <div style="width:${Math.abs(val)*100}%; height:100%; background:${color}; box-shadow: 0 0 8px ${color}44;"></div>
+                    </div>
+                    <span style="color:${color}; font-weight:bold; width:35px; text-align:right;">${val.toFixed(2)}</span>
+                </div>`;
         }).join('');
-        document.getElementById('correlationMatrix').innerHTML = html;
-    }
+    
+    document.getElementById('correlationMatrix').innerHTML = html;
+}
 
-    function renderHeatmap(data) {
-        const days = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"];
-        const metric = document.getElementById('metricA').value;
-        const stats = [0,1,2,3,4,5,6].map(() => ({ sum: 0, count: 0 }));
-        data.forEach(d => { if(d["Minutes passées en stream"] > 0) { let day = d._date.getDay() - 1; if(day === -1) day = 6; stats[day].sum += d[metric] || 0; stats[day].count++; } });
-        const averages = stats.map(s => s.count > 0 ? s.sum/s.count : 0);
-        const max = Math.max(...averages);
-        let html = '<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:8px; margin-top:10px;">';
-        averages.forEach((avg, i) => { 
-            const intensity = max > 0 ? avg/max : 0; 
-            html += `<div style="text-align:center"><div style="height:30px; border-radius:4px; background:rgba(145,70,255,${0.1 + intensity*0.8}); border:1px solid rgba(145,70,255,${intensity})"></div><div style="font-size:0.55rem; color:var(--text-dim); margin-top:4px;">${days[i]}</div></div>`; 
-        });
-        document.getElementById('heatmap').innerHTML = html + '</div>';
-    }
+
+function renderDayChart(data) {
+    const ctx = document.getElementById('dayChart').getContext('2d');
+    if(charts.dayChart) charts.dayChart.destroy();
+
+    const days = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"];
+    const metricKey = document.getElementById('metricA').value;
+    const metricLabel = METRICS_DICT[metricKey].label;
+    
+    // Initialisation des compteurs
+    const stats = [0,1,2,3,4,5,6].map(() => ({ sum: 0, count: 0 }));
+
+    // Agrégation des données par jour de la semaine
+    data.forEach(d => { 
+        if(d["Minutes passées en stream"] > 0) { 
+            let day = d._date.getDay() - 1; // Lundi = 0
+            if(day === -1) day = 6; // Dimanche = 6
+            stats[day].sum += d[metricKey] || 0; 
+            stats[day].count++; 
+        } 
+    });
+
+    const averages = stats.map(s => s.count > 0 ? (s.sum / s.count).toFixed(1) : 0);
+
+    charts.dayChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: days,
+            datasets: [{
+                label: metricLabel,
+                data: averages,
+                backgroundColor: 'rgba(0, 229, 255, 0.4)',
+                borderColor: '#00e5ff',
+                borderWidth: 2,
+                borderRadius: 5,
+                hoverBackgroundColor: '#00ffa3'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `${ctx.raw} (Moyenne)`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#9aa0a6', font: { size: 10 } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#f5f5f7', font: { family: 'Orbitron', size: 10 } }
+                }
+            }
+        }
+    });
+}
+
 
 async function callMammouthAI() {
     const btn = document.getElementById('mammouthBtn'); 
