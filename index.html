@@ -1,3 +1,411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLUTONH ANALYTICS | V7.0 NEBULA APEX</title>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #030305; --bg-panel: #0a0a0f; --bg-card: #12121a;
+            --twitch-purple: #9146FF; --accent-blue: #00e5ff; --accent-green: #00ffa3;
+            --accent-red: #ff4f4d; --accent-gold: #ffd700; --text-main: #f5f5f7;
+            --text-dim: #9aa0a6; --border: rgba(145, 70, 255, 0.2);
+            --glow: 0 0 20px rgba(145, 70, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { color-scheme: dark; }
+        
+        body { 
+            background-color: var(--bg-base); color: var(--text-main); 
+            font-family: 'Inter', sans-serif; overflow-x: hidden; 
+            background-image: radial-gradient(circle at 50% -20%, #1a1a2e 0%, transparent 50%); 
+        }
+
+        .container { padding: 20px; max-width: 1650px; margin: 0 auto; }
+        
+        .header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 20px; padding: 12px 25px; background: var(--bg-panel); 
+            border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--glow); 
+        }
+        
+        .logo { font-family: 'Orbitron', sans-serif; font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; }
+        .logo span { color: var(--twitch-purple); }
+
+        .controls-bar { 
+            display: flex; gap: 15px; align-items: center; flex-wrap: wrap; 
+            background: var(--bg-card); padding: 12px 20px; border-radius: 12px; 
+            margin-bottom: 20px; border: 1px solid var(--border);
+        }
+
+        .date-picker { 
+            background: #000; border: 1px solid var(--twitch-purple); color: #fff; 
+            padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; 
+            font-family: 'Orbitron', sans-serif; cursor: pointer;
+        }
+
+        .btn-preset { 
+            background: transparent; border: 1px solid var(--border); 
+            color: var(--text-dim); padding: 8px 10px; border-radius: 6px; 
+            cursor: pointer; font-size: 0.75rem; font-weight: 600; transition: 0.3s;
+        }
+        .btn-preset:hover { border-color: var(--twitch-purple); color: #fff; }
+        .btn-preset.active { background: var(--twitch-purple); color: white; border-color: var(--twitch-purple); box-shadow: 0 0 15px rgba(145, 70, 255, 0.4); }
+
+        .dashboard-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .card { 
+            background: var(--bg-panel); border: 1px solid var(--border); 
+            border-radius: 15px; padding: 18px; position: relative;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .card:hover { transform: translateY(-5px); border-color: var(--twitch-purple); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        
+        .span-2 { grid-column: span 2; } .span-3 { grid-column: span 3; } .row-2 { grid-row: span 2; }
+
+        .kpi-title { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; display: block; }
+        .kpi-value { font-family: 'Orbitron', sans-serif; font-size: 1.5rem; font-weight: 700; }
+
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .chart-title { font-family: 'Orbitron', sans-serif; font-size: 0.8rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+        .chart-wrap { height: 320px; width: 100%; }
+        
+        select { background: #000; color: white; border: 1px solid var(--border); padding: 8px; border-radius: 6px; font-size: 0.85rem; outline: none; }
+
+        .ai-section { background: linear-gradient(160deg, #0a0a0f 0%, #0d0d1a 100%); border-color: var(--twitch-purple); }
+        .ai-btn { 
+            background: linear-gradient(45deg, var(--twitch-purple), var(--accent-blue)); 
+            border: none; color: white; padding: 8px 16px; border-radius: 8px; 
+            font-weight: 800; cursor: pointer; font-family: 'Orbitron', sans-serif; 
+            font-size: 0.65rem; transition: 0.3s; animation: pulse-ai 2s infinite;
+        }
+        @keyframes pulse-ai { 0% { box-shadow: 0 0 0 0 rgba(145, 70, 255, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(145, 70, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(145, 70, 255, 0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="welcomeScreen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center;">
+        <div class="logo" style="font-size: 3rem;">🛰️ PLUTONH <span>NEBULA APEX</span></div>
+        <p style="color:var(--text-dim); margin-top:15px; font-family:'Orbitron'">COMMAND & CONTROL INTERFACE</p>
+        <button onclick="document.getElementById('csvInput').click()" style="background: var(--twitch-purple); color: white; border: none; padding: 20px 40px; border-radius: 12px; font-size: 1.2rem; font-weight: bold; cursor: pointer; box-shadow: 0 10px 30px rgba(145,70,255,0.3); margin-top: 25px;">IMPORTER DONNÉES TWITCH</button>
+        <input type="file" id="csvInput" accept=".csv" style="display: none;">
+    </div>
+
+    <div id="dashboard" style="display:none;">
+        <div class="header">
+            <div class="logo">NEBULA <span>APEX_V7.0</span></div>
+            <div id="activeDateRange" style="font-size: 0.8rem; font-family:'Orbitron'; color: var(--twitch-purple);">ANALYSIS ACTIVE</div>
+        </div>
+
+                        <!-- NOUVEAU BLOC : INSPECTEUR DE STREAM -->
+            <div class="stream-inspector" style="grid-column: 1 / -1; background: linear-gradient(180deg, #0a0a0f 0%, #12121a 100%); border-top: 2px solid var(--accent-blue); padding: 20px; border-radius: 12px; margin-top: 15px;">
+
+                <div class="chart-header"><div class="chart-title">🔎 INSPECTEUR DE STREAM (LIVE PAR LIVE)</div></div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                   <button id="btnPrevStream" onclick="navigateStream(-1)" style="background: var(--bg-card); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron';">&#9664; PRÉCÉDENT</button>
+<div id="streamTitle" style="font-family: 'Orbitron'; font-size: 1.2rem; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.2);">SÉLECTIONNEZ UNE PÉRIODE</div>
+<button id="btnNextStream" onclick="navigateStream(1)" style="background: var(--bg-card); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron';">SUIVANT &#9654;</button>
+
+                </div>
+                                <!-- GRILLE 8 COLONNES -->
+                                <!-- GRILLE 8 COLONNES -->
+                <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px;">
+                    
+                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
+                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Temps de Live</div>
+                        <div><span id="ss-time" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0h</span></div>
+                        <span id="ss-time-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+                    </div>
+
+                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
+                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Viewers Moy.</div>
+                        <div><span id="ss-viewers" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+                        <div id="ss-viewers-max" style="font-size: 0.7rem; color: var(--twitch-purple); margin-top: 2px;">Max: 0</div>
+                        <span id="ss-viewers-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+                    </div>
+
+                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
+                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nouveaux Followers</div>
+                        <div><span id="ss-follows" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">+0</span></div>
+                        <span id="ss-follows-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+                    </div>
+
+                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
+                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nouveaux Subs</div>
+                        <div><span id="ss-subs" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">+0</span></div>
+                        <span id="ss-subs-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+                    </div>
+
+                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
+                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Revenus</div>
+                        <div><span id="ss-rev" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0.00$</span></div>
+                        <div id="ss-rev-hour" style="font-size: 0.7rem; color: var(--twitch-purple); margin-top: 2px;">0$/h</div>
+                        <span id="ss-rev-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+                    </div>
+
+                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
+                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Chatters Uniques</div>
+                        <div><span id="ss-chatters" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+                        <span id="ss-chatters-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+                    </div>
+
+                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
+                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Messages Chat</div>
+                        <div><span id="ss-msgs" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+                        <span id="ss-msgs-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+                    </div>
+
+                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
+                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Rétention</div>
+                        <div><span id="ss-retention" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0%</span></div>
+                        <span id="ss-retention-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+                    </div>
+
+                </div>
+
+
+
+
+        <div class="controls-bar" style="margin-top: 25px;">
+
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button class="btn-preset" onclick="shiftRange(-1)">❮</button>
+                <input type="date" id="dateStart" class="date-picker" onchange="refresh()">
+                <span style="color:var(--twitch-purple); font-weight:bold;">➔</span>
+                <input type="date" id="dateEnd" class="date-picker" onchange="refresh()">
+                <button class="btn-preset" onclick="shiftRange(1)">❯</button>
+            </div>
+            <div style="display:flex; gap:5px; margin-left:10px;">
+                <button class="btn-preset" onclick="setTimeRange(7, this)">7J</button>
+                <button class="btn-preset active" onclick="setTimeRange(30, this)">30J</button>
+                <button class="btn-preset" onclick="setTimeRange(90, this)">3M</button>
+                <button class="btn-preset" onclick="setTimeRange(180, this)">6M</button>
+                <button class="btn-preset" onclick="setTimeRange(365, this)">1A</button>
+                <button class="btn-preset" onclick="setTimeRange('all', this)">MAX</button>
+            </div>
+            <div style="margin-left:auto; display:flex; gap:10px">
+                <select id="metricA" onchange="refresh()"></select>
+                <select id="metricB" onchange="refresh()"></select>
+                <select id="sma" onchange="refresh()">
+                    <option value="1">LISSAGE OFF</option>
+                    <option value="7">SMA 7J</option>
+                    <option value="14">SMA 14J</option>
+                    <option value="30">SMA 30J</option>
+                </select>
+            </div>
+        </div> <!-- C'EST CETTE BALISE QUI AVAIT DISPARU ! -->
+
+        <!-- Notre zone de texte descriptive -->
+        <div id="metricDesc" style="text-align: right; color: var(--text-dim); font-size: 0.75rem; margin-top: 10px; margin-bottom: 15px; padding-right: 5px; font-style: italic;"></div>
+
+        <div class="dashboard-grid">
+            <div class="card" id="kpi-1"></div>
+            <div class="card" id="kpi-2"></div>
+            <div class="card" id="kpi-3"></div>
+            <div class="card" id="kpi-4"></div>
+
+
+            <div class="card span-3 row-2">
+                <div class="chart-header"><div class="chart-title">🌀 ANALYSE COMPARATIVE TEMPORELLE</div></div>
+                <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+            </div>
+
+            <div class="card row-2">
+                <div class="chart-header"><div class="chart-title">💰 REVENUS</div></div>
+                <div style="height:220px;"><canvas id="revenuePie"></canvas></div>
+                <div id="revenueTotal" style="text-align:center; margin-top:15px; font-family:'Orbitron'; font-size:1.1rem; color:var(--accent-green)"></div>
+            </div>
+
+            <div class="card span-2">
+                <div class="chart-header">
+                  <div class="chart-title">📊 PERFORMANCE PAR JOUR (MOY.)</div>
+                </div>
+                <div class="chart-wrap"><canvas id="dayChart"></canvas></div>
+            </div>
+
+            <div class="card span-2"><div class="chart-header"><div class="chart-title">🧬 MATRICE DE CORRÉLATION</div></div><div id="correlationMatrix"></div></div>
+
+            <div class="card span-2 row-2">
+                <div class="chart-header">
+                    <div class="chart-title">📊 CROISSANCE MENSUELLE vs ANNÉE-1</div>
+                    <select id="monthlyMetric" onchange="renderMonthlyTrend()"></select>
+                </div>
+                <div class="chart-wrap"><canvas id="monthlyChart"></canvas></div>
+            </div>
+
+            <div class="card span-2 row-2 ai-section">
+                <div class="chart-header">
+                    <div class="chart-title" style="color:var(--accent-green)">🤖 COACHING STRATÉGIQUE AI</div>
+                    <button id="mammouthBtn" class="ai-btn" onclick="callMammouthAI()">LANCER ANALYSE</button>
+                </div>
+                <div id="aiInsights" style="font-size:0.85rem; line-height:1.4; max-height:280px; overflow-y:auto; padding-right:10px;"><p style="color:var(--text-dim); text-align:center; padding-top:100px;">Prêt à analyser vos performances...</p></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    const MAMMOUTH_API_KEY = "sk-V8lDi4z2OqrCHSzKdd9aCA";
+    const MAMMOUTH_MODEL = "gemini-3.1-pro-preview";
+    let db = [];
+    let charts = {};
+    let currentStreamList = [];
+    let currentStreamIndex = 0;
+
+
+    const METRICS_DICT = {
+        "Spectateurs en moyenne": { label: "Spectateurs Moyens", isAverage: true, desc: "Nombre moyen de spectateurs connectés simultanément pendant le stream." },
+        "Minutes passées en stream": { label: "Durée du Live", isAverage: false, desc: "Temps total de diffusion de votre stream." },
+        "Spectateurs max.": { label: "Pic de Viewers", isAverage: true, desc: "Audience maximale (pic) atteinte à un instant T pendant le live." },
+        "Spectateurs uniques": { label: "Viewers Uniques", isAverage: false, desc: "Nombre total de personnes différentes ayant ouvert votre stream." },
+        "Nouveaux followers": { label: "Followers", isAverage: false, desc: "Nombre de nouveaux utilisateurs ayant cliqué sur le bouton 'Suivre'." },
+        "Cumul followers": { label: "Followers Cumulés", isAverage: false, desc: "Évolution globale de votre nombre de followers dans le temps." },
+        "Minutes regardées": { label: "Minutes Regardées", isAverage: false, desc: "Cumul du temps de visionnage de l'ensemble de vos spectateurs." },
+        "Personnes sur le chat": { label: "Chatteurs Uniques", isAverage: false, desc: "Nombre de spectateurs uniques ayant envoyé au moins un message." },
+        "Messages / Chatter": { label: "Messages / Chatter", isAverage: true, desc: "Nombre moyen de messages envoyés par chaque personne active sur le chat.", calc: r => r["Personnes sur le chat"] > 0 ? (r["Messages du chat"] / r["Personnes sur le chat"]) : 0 },
+        "Nouveaux subs": { label: "Nouveaux Subs", isAverage: false, desc: "Abonnements payants, offerts ou Prime obtenus sur la journée." },
+        "Subs actifs": { label: "Subs Actifs", isAverage: false, desc: "Estimation des abonnements encore actifs (basée sur les 30 derniers jours glissants)." },
+        "_revTotal": { label: "Revenus Totaux ($)", isAverage: false, desc: "Total cumulé de tous vos revenus Twitch (Subs, Bits, Pubs, Prime, etc.)." },
+        "_stickiness": { label: "Rétention Moyenne (Min)", isAverage: true, desc: "Temps moyen passé par un viewer sur votre stream. Mesure l'engagement.", calc: r => r["Spectateurs uniques"] > 0 ? r["Minutes regardées"] / r["Spectateurs uniques"] : 0 },
+        "_convRate": { label: "Taux Conversion Follow (%)", isAverage: true, desc: "Pourcentage de viewers uniques qui décident de vous follow.", calc: r => r["Spectateurs uniques"] > 0 ? (r["Nouveaux followers"] / r["Spectateurs uniques"]) * 100 : 0 },
+        "Part Anciens Viewers (%)": { label: "Fidélisation (%)", isAverage: true, desc: "Proportion d'habitués par rapport aux nouveaux venus dans le chat.", calc: r => { const totalImpliques = (r["Anciens viewers impliqués"]||0) + (r["Nouveaux viewers impliqués"]||0); return totalImpliques > 0 ? (r["Anciens viewers impliqués"] / totalImpliques) * 100 : 0;} },
+        "_hypeEfficiency": { label: "Efficacité Hype (Max/Moy)", isAverage: true, desc: "Ratio pic/moyenne. Un chiffre élevé indique des pics d'audience intenses (ex: gros raids).", calc: r => r["Spectateurs en moyenne"] > 0 ? r["Spectateurs max."] / r["Spectateurs en moyenne"] : 1 },
+        "_hourlyEarnings": { label: "Taux Horaire ($/H)", isAverage: true, desc: "Estimation des revenus générés pour chaque heure de diffusion.", calc: r => r["Minutes passées en stream"] > 0 ? r._revTotal / (r["Minutes passées en stream"] / 60) : 0 },
+        "_revPerUnique": { label: "Valeur / Unique ($)", isAverage: true, desc: "Revenus moyens générés par chaque spectateur unique passé sur le stream.", calc: r => r["Spectateurs uniques"] > 0 ? r._revTotal / r["Spectateurs uniques"] : 0 }
+    };
+
+
+    document.getElementById('csvInput').addEventListener('change', (e) => {
+        if(!e.target.files.length) return;
+        Papa.parse(e.target.files[0], {
+            header: true, dynamicTyping: true, skipEmptyLines: true,
+complete: (res) => {
+    db = res.data.map(r => {
+        r._date = new Date(r.Date);
+        r._revTotal = (r["Revenu issu des abonnements"]||0) + (r["Revenu Prime"]||0) + (r["Revenus issus des abonnements offerts"]||0) + (r["Revenu des Bits"]||0) + (r["Revenu issu de la publicité"]||0) + (r["Revenus Turbo"]||0);
+        
+        // Calcul des subs du jour
+        r._dailySubs = (r["Abonnements Prime"] || 0) + (r["Abonnements payés au total"] || 0) + (r["Abonnements offerts au total"] || 0);
+        
+        // --- NOUVELLE LIGNE : On rend les nouveaux subs disponibles pour les graphiques ---
+        r["Nouveaux subs"] = r._dailySubs;
+
+        Object.keys(METRICS_DICT).forEach(k => { if(METRICS_DICT[k].calc) r[k] = METRICS_DICT[k].calc(r); });
+        return r;
+    }).sort((a,b) => a._date - b._date);
+
+    // --- CUMUL FOLLOWERS ---
+    let cumul = 0;
+    db.forEach(r => {
+        cumul += (r["Nouveaux followers"] || 0);
+        r["Cumul followers"] = cumul;
+    });
+
+    // --- SUBS ACTIFS (30 JOURS GLISSANTS) ---
+    db.forEach((r, i) => {
+        const dateLimite = new Date(r._date.getTime() - (30 * 24 * 3600 * 1000));
+        let subsActifs = 0;
+        for (let j = i; j >= 0; j--) {
+            if (db[j]._date > dateLimite) {
+                subsActifs += db[j]._dailySubs;
+            } else {
+                break;
+            }
+        }
+        r["Subs actifs"] = subsActifs;
+    });
+
+    initUI();
+}
+
+
+
+        });
+    });
+
+    function initUI() {
+        ['metricA', 'metricB', 'monthlyMetric'].forEach(id => {
+            const el = document.getElementById(id);
+            el.innerHTML = id === 'metricB' ? '<option value="none">AUCUNE COMPARAISON</option>' : '';
+            Object.keys(METRICS_DICT).forEach(k => el.add(new Option(METRICS_DICT[k].label, k)));
+        });
+        document.getElementById('metricA').value = "Spectateurs en moyenne";
+        document.getElementById('metricB').value = "Minutes passées en stream";
+        document.getElementById('welcomeScreen').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        setTimeRange(30);
+    }
+
+    function setTimeRange(days, btn) {
+        const end = db[db.length-1]._date;
+        const start = days === 'all' ? db[0]._date : new Date(end.getTime() - (days * 24 * 3600 * 1000));
+        document.getElementById('dateStart').valueAsDate = start;
+        document.getElementById('dateEnd').valueAsDate = end;
+        if(btn) { document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+        refresh();
+    }
+
+    function shiftRange(dir) {
+        const s = document.getElementById('dateStart').valueAsDate;
+        const e = document.getElementById('dateEnd').valueAsDate;
+        const diff = (e - s) || (30 * 24 * 3600 * 1000);
+        document.getElementById('dateStart').valueAsDate = new Date(s.getTime() + diff * dir);
+        document.getElementById('dateEnd').valueAsDate = new Date(e.getTime() + diff * dir);
+        refresh();
+    }
+
+    function refresh() {
+        const dS = document.getElementById('dateStart').valueAsDate;
+        const dE = document.getElementById('dateEnd').valueAsDate;
+        if(!dS || !dE) return;
+        dE.setHours(23,59,59);
+        const filtered = db.filter(d => d._date >= dS && d._date <= dE);
+        const prevS = new Date(dS.getTime() - (dE - dS));
+        const prevData = db.filter(d => d._date >= prevS && d._date < dS);
+        
+        updateKpis(filtered, prevData);
+        renderMainChart(filtered);
+        renderRevenuePie(filtered);
+        renderMonthlyTrend();
+        renderCorrelation(filtered);
+        renderDayChart(filtered);;
+
+        // --- NOUVELLES LIGNES A AJOUTER ICI ---
+        const selectedMetric = document.getElementById('metricA').value;
+        const descDiv = document.getElementById('metricDesc');
+        if (METRICS_DICT[selectedMetric] && METRICS_DICT[selectedMetric].desc) {
+            descDiv.innerText = "ℹ️ " + METRICS_DICT[selectedMetric].desc;
+        } else {
+            descDiv.innerText = ""; // On vide si pas de description
+        }
+    // Mise à jour de l'inspecteur de stream avec les données actuelles (filtrées !)
+    currentStreamList = filtered.filter(d => (d["Minutes passées en stream"] || 0) > 0);
+    currentStreamIndex = currentStreamList.length > 0 ? currentStreamList.length - 1 : 0; // Se place sur le stream le plus récent
+    updateStreamInspector();
+
+    }
+
+
+    function updateKpis(curr, prev) {
+        const keys = ["Spectateurs en moyenne", "Nouveaux followers", "_revTotal", "Minutes passées en stream"];
+        keys.forEach((k, i) => {
+            const getVal = (arr) => {
+                const streams = arr.filter(d => d["Minutes passées en stream"] > 0);
+                if(METRICS_DICT[k].isAverage) return streams.length ? (streams.reduce((a,b)=>a+(b[k]||0),0) / streams.length) : 0;
+                return arr.reduce((a,b)=>a+(b[k]||0),0);
+            };
+            const val = getVal(curr); const pVal = getVal(prev);
+            const delta = pVal > 0 ? ((val - pVal) / pVal * 100) : 0;
+            const display = k === "Minutes passées en stream" ? Math.round(val/60)+'h' : (k === "_revTotal" ? val.toFixed(2)+'$' : Math.round(val));
+            document.getElementById(`kpi-${i+1}`).innerHTML = `<span class="kpi-title">${METRICS_DICT[k].label}</span><div class="kpi-value">${display}</div><div style="color:${delta>=0?'var(--accent-green)':'var(--accent-red)'}; font-size:0.75rem; font-weight:bold; margin-top:5px;">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}%</div>`;
+        });
+    }
+
     function renderMainChart(data) {
         const ctx = document.getElementById('mainChart').getContext('2d');
         if(charts.main) charts.main.destroy();
@@ -41,3 +449,500 @@
             } 
         });
     }
+
+
+function renderMonthlyTrend() {
+    const canvas = document.getElementById('monthlyChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if(charts.monthly) charts.monthly.destroy();
+
+    const key = document.getElementById('monthlyMetric').value;
+    const groups = {};
+
+    // --- LISTE DE FORCE ---
+    // On définit strictement ce qui doit être ADDITIONNÉ (Somme totale du mois)
+    const forceSum = [
+        "Nouveaux followers", 
+        "Nouveaux subs", 
+        "_revTotal", 
+        "Revenu issu des abonnements",
+        "Revenu Prime",
+        "Revenus issus des abonnements offerts",
+        "Revenu des Bits",
+        "Revenu issu de la publicité",
+        "Minutes passées en stream",
+        "Vues live",
+        "Messages du chat"
+    ];
+
+    // On définit ce qui est un état (Cumul)
+    const isSnapshot = (key === "Cumul followers" || key === "Subs actifs");
+    
+    // On définit ce qui est une MOYENNE (Viewers)
+    // Tout ce qui n'est pas dans forceSum ou Snapshot sera une moyenne par défaut
+    const isSum = forceSum.includes(key);
+
+    // 1. Groupement des données
+    db.forEach(d => {
+        const mKey = d._date.getFullYear() + '-' + String(d._date.getMonth() + 1).padStart(2, '0');
+        const mLabel = d._date.toLocaleString('fr-FR', { month: 'short', year: '2-digit' });
+
+        if (!groups[mKey]) {
+            groups[mKey] = { label: mLabel, sum: 0, count: 0, lastVal: 0, lastDate: new Date(0) };
+        }
+
+        // On nettoie la valeur (Twitch met parfois des virgules ou des espaces)
+        let val = d[key];
+        if (typeof val === 'string') val = parseFloat(val.replace(',', '.').replace(/\s/g, ''));
+        val = parseFloat(val) || 0;
+
+        if (isSnapshot) {
+            // MODE CUMUL
+            if (d._date >= groups[mKey].lastDate) {
+                groups[mKey].lastVal = val;
+                groups[mKey].lastDate = d._date;
+            }
+        } else if (isSum) {
+            // MODE SOMME (Followers, etc.) : ON PREND TOUT LE MONDE SANS CONDITIONS
+            groups[mKey].sum += val;
+            groups[mKey].count = 1; // Pas de division
+        } else {
+            // MODE MOYENNE (Spectateurs) : Uniquement les jours avec stream
+            if (parseFloat(d["Minutes passées en stream"]) > 0) {
+                groups[mKey].sum += val;
+                groups[mKey].count++;
+            }
+        }
+    });
+
+    // 2. Préparation des axes (12 derniers mois)
+    const sortedKeys = Object.keys(groups).sort().slice(-12);
+    
+    const getFinalVal = (mKey) => {
+        const g = groups[mKey];
+        if (!g) return 0;
+        if (isSnapshot) return g.lastVal;
+        return (g.count > 0) ? g.sum / g.count : 0;
+    };
+
+    const dataActual = sortedKeys.map(k => getFinalVal(k));
+    const dataPrev = sortedKeys.map(k => {
+        const [y, m] = k.split('-');
+        const prevKey = (parseInt(y) - 1) + '-' + m;
+        return getFinalVal(prevKey);
+    });
+
+    // 3. Graphique
+    charts.monthly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: sortedKeys.map(k => groups[k].label),
+            datasets: [
+                { label: 'Actuel', data: dataActual, backgroundColor: '#00e5ff', borderRadius: 4, barPercentage: 0.7 },
+                { label: 'Année-1', data: dataPrev, backgroundColor: 'rgba(145, 70, 255, 0.3)', borderRadius: 4, barPercentage: 0.7 }
+            ]
+        },
+        // ... dans renderMonthlyTrend, à l'intérieur de charts.monthly = new Chart(...)
+        options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+        mode: 'index',      // Sélectionne tous les éléments de la colonne (Actuel + Année-1)
+        intersect: false,   // Pas besoin d'être sur la barre pour activer
+    },
+    plugins: {
+        legend: { display: false },
+        tooltip: {
+            enabled: true,
+            backgroundColor: 'rgba(10, 10, 15, 0.9)',
+            titleFont: { family: 'Orbitron' },
+            bodyFont: { family: 'Inter' },
+            padding: 12,
+            borderColor: 'rgba(145, 70, 255, 0.3)',
+            borderWidth: 1,
+            callbacks: {
+                label: (c) => ` ${c.dataset.label}: ${c.raw.toLocaleString('fr-FR', {maximumFractionDigits: isSum ? 0 : 1})}`
+            }
+        }
+    },
+    scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#666', font: { size: 10 } } },
+        x: { grid: { display: false }, ticks: { color: '#666', font: { size: 10 } } }
+    }
+}
+
+    });
+}
+
+
+
+
+
+
+
+   function renderRevenuePie(data) {
+    const ctx = document.getElementById('revenuePie').getContext('2d');
+    if(charts.pie) charts.pie.destroy();
+    
+    const sums = { 
+        "Subs Payés": data.reduce((a,b)=>a+(b["Revenu issu des abonnements"]||0), 0),
+        "Subs Prime": data.reduce((a,b)=>a+(b["Revenu Prime"]||0), 0),
+        "Subs Offerts": data.reduce((a,b)=>a+(b["Revenus issus des abonnements offerts"]||0), 0),
+        "Bits": data.reduce((a,b)=>a+(b["Revenu des Bits"]||0), 0),
+        "Publicité": data.reduce((a,b)=>a+(b["Revenu issu de la publicité"]||0), 0),
+        // Ajout de la catégorie Autres pour combler le trou :
+        "Autres": data.reduce((a,b)=>a+((b["Revenus Turbo"]||0) + (b["Revenu issu des ventes de jeux"]||0) + (b["Revenu des extensions"]||0) + (b["Revenus des offres"]||0) + (b["Autres revenus d'interactions de Bits"]||0)), 0)
+    };
+
+    
+    const total = Object.values(sums).reduce((a,b)=>a+b,0);
+    document.getElementById('revenueTotal').innerText = `TOTAL: ${total.toFixed(2)}$`;
+    
+    charts.pie = new Chart(ctx, { 
+        type: 'doughnut', 
+        data: { 
+            labels: Object.keys(sums), 
+            datasets: [{ 
+                data: Object.values(sums), 
+                // Ajout d'une 5ème couleur (bleu néon #00e5ff) pour la nouvelle catégorie
+                backgroundColor: ['#9146FF', '#00e5ff', '#bf94ff', '#00ffa3', '#ffd700'], 
+                borderWidth: 0, 
+                hoverOffset: 15 
+            }] 
+        }, 
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { 
+                legend: { position: 'bottom', labels: { color:'#fff', boxWidth: 10, font: { size: 9 } } } 
+            }, 
+            cutout: '70%' 
+        } 
+    });
+}
+
+
+function renderCorrelation(data) {
+    const target = document.getElementById('metricA').value;
+    const streams = data.filter(d => d["Minutes passées en stream"] > 0);
+    if(streams.length < 3) return;
+
+    const calcCorr = (x, y) => {
+        const n = x.length; 
+        const sX = x.reduce((a,b)=>a+b,0); 
+        const sY = y.reduce((a,b)=>a+b,0);
+        const sXY = x.reduce((a,b,i)=>a+b*y[i],0); 
+        const sX2 = x.reduce((a,b)=>a+b*b,0); 
+        const sY2 = y.reduce((a,b)=>a+b*b,0);
+        const num = n * sXY - sX * sY; 
+        const den = Math.sqrt((n * sX2 - sX*sX) * (n * sY2 - sY*sY));
+        return den === 0 ? 0 : num / den;
+    };
+
+    const targetArr = streams.map(d => d[target]);
+
+    // Changement : .slice(0, 10) pour afficher les 10 premières métriques du dictionnaire
+    const html = Object.keys(METRICS_DICT)
+        .filter(k => k !== target && !k.startsWith('_'))
+        .slice(0, 10) 
+        .map(k => {
+            const val = calcCorr(targetArr, streams.map(d => d[k]||0));
+            const color = val > 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            // J'ai un peu augmenté l'espacement (margin-bottom: 12px) et la taille des barres
+            return `
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px; font-size:0.75rem;">
+                    <span style="width:140px; color:var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${METRICS_DICT[k].label}</span>
+                    <div style="flex:1; height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden;">
+                        <div style="width:${Math.abs(val)*100}%; height:100%; background:${color}; box-shadow: 0 0 8px ${color}44;"></div>
+                    </div>
+                    <span style="color:${color}; font-weight:bold; width:35px; text-align:right;">${val.toFixed(2)}</span>
+                </div>`;
+        }).join('');
+    
+    document.getElementById('correlationMatrix').innerHTML = html;
+}
+
+
+function renderDayChart(data) {
+    const ctx = document.getElementById('dayChart').getContext('2d');
+    if(charts.dayChart) charts.dayChart.destroy();
+
+    const days = ["LUN", "MAR", "MER", "JEU", "VEN", "SAM", "DIM"];
+    const metricKey = document.getElementById('metricA').value;
+    const metricLabel = METRICS_DICT[metricKey].label;
+    
+    // Initialisation des compteurs
+    const stats = [0,1,2,3,4,5,6].map(() => ({ sum: 0, count: 0 }));
+
+    // Agrégation des données par jour de la semaine
+    data.forEach(d => { 
+        if(d["Minutes passées en stream"] > 0) { 
+            let day = d._date.getDay() - 1; // Lundi = 0
+            if(day === -1) day = 6; // Dimanche = 6
+            stats[day].sum += d[metricKey] || 0; 
+            stats[day].count++; 
+        } 
+    });
+
+    const averages = stats.map(s => s.count > 0 ? (s.sum / s.count).toFixed(1) : 0);
+
+    charts.dayChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: days,
+            datasets: [{
+                label: metricLabel,
+                data: averages,
+                backgroundColor: 'rgba(0, 229, 255, 0.4)',
+                borderColor: '#00e5ff',
+                borderWidth: 2,
+                borderRadius: 5,
+                hoverBackgroundColor: '#00ffa3'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => `${ctx.raw} (Moyenne)`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#9aa0a6', font: { size: 10 } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#f5f5f7', font: { family: 'Orbitron', size: 10 } }
+                }
+            }
+        }
+    });
+}
+function updateStreamInspector() {
+    // 1. GESTION S'IL N'Y A AUCUN STREAM
+    if (currentStreamList.length === 0) {
+        document.getElementById('streamTitle').innerText = "AUCUN STREAM TROUVÉ";
+        document.getElementById('ss-time').innerText = "0h";
+        document.getElementById('ss-viewers').innerText = "0";
+        document.getElementById('ss-viewers-max').innerText = "Max: 0";
+        document.getElementById('ss-follows').innerText = "+0";
+        document.getElementById('ss-subs').innerText = "+0";
+        document.getElementById('ss-rev').innerText = "0.00$";
+        document.getElementById('ss-rev-hour').innerText = "0$/h";
+        document.getElementById('ss-chatters').innerText = "0";
+        document.getElementById('ss-msgs').innerText = "0";
+        document.getElementById('ss-retention').innerText = "0%";
+        
+        // Nettoyage des différences
+        ['time', 'viewers', 'follows', 'subs', 'rev', 'chatters', 'msgs', 'retention'].forEach(k => {
+            let diffEl = document.getElementById(`ss-${k}-diff`);
+            if(diffEl) diffEl.innerHTML = '';
+        });
+        return;
+
+            // Synchronisation avec le graphique principal
+    if (typeof mainChart !== 'undefined' && mainChart !== null) {
+        // Force l'affichage du tooltip et du point sur le graphique
+        mainChart.setActiveElements([
+            { datasetIndex: 0, index: currentStreamIndex },
+            { datasetIndex: 1, index: currentStreamIndex }
+        ]);
+        mainChart.tooltip.setActiveElements([
+            { datasetIndex: 0, index: currentStreamIndex }
+        ], { x: 0, y: 0 });
+        mainChart.update();
+    }
+
+    }
+
+    // 2. RÉCUPÉRATION DES DONNÉES DU STREAM ACTUEL
+    const s = currentStreamList[currentStreamIndex];
+    const dateStr = s._date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    
+    document.getElementById('streamTitle').innerText = `🔴 STREAM DU ${dateStr.toUpperCase()}`;
+    
+    const hours = (s["Minutes passées en stream"] || 0) / 60;
+    const avgViewers = s["Spectateurs en moyenne"] || 0;
+    const maxViewers = s["Spectateurs max."] || 0;
+    const follows = s["Nouveaux followers"] || 0;
+    const subs = s["Nouveaux subs"] || s["Abonnements payés au total"] || 0;
+    const rev = s._revTotal || 0;
+    const chatters = s["Personnes sur le chat"] || 0;
+    const uniques = s["Spectateurs uniques"] || 0;
+    const msgs = s["Messages du chat"] || 0;
+    const retention = uniques > 0 ? (avgViewers / uniques) * 100 : 0;
+
+    // 3. AFFICHAGE DES VALEURS PRINCIPALES
+    document.getElementById('ss-time').innerText = hours.toFixed(1) + "h";
+    document.getElementById('ss-viewers').innerText = Math.round(avgViewers);
+    document.getElementById('ss-viewers-max').innerText = `Max: ${maxViewers}`;
+    document.getElementById('ss-follows').innerText = `+${follows}`;
+    document.getElementById('ss-subs').innerText = `+${subs}`;
+    document.getElementById('ss-rev').innerText = rev.toFixed(2) + "$";
+    document.getElementById('ss-rev-hour').innerText = hours > 0 ? (rev/hours).toFixed(2) + "$ / heure" : "0$ / heure";
+    document.getElementById('ss-chatters').innerText = chatters;
+    document.getElementById('ss-msgs').innerText = msgs;
+    document.getElementById('ss-retention').innerText = retention.toFixed(1) + "%";
+
+    // 4. CALCUL ET AFFICHAGE DES DIFFÉRENCES AVEC LE STREAM PRÉCÉDENT
+    const prevS = currentStreamIndex > 0 ? currentStreamList[currentStreamIndex - 1] : null;
+
+    const renderDiff = (id, currentVal, prevVal, isCurrency = false) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (!prevS) { el.innerHTML = ""; return; }
+        
+        const diff = currentVal - prevVal;
+        if (Math.abs(diff) < 0.01) { 
+            el.innerHTML = '<span style="color: rgba(255,255,255,0.3);">=</span>'; 
+            return; 
+        }
+
+        const color = diff > 0 ? 'rgba(0, 255, 163, 0.8)' : 'rgba(255, 79, 77, 0.8)'; // Vert ou Rouge discret
+        const sign = diff > 0 ? '▲' : '▼';
+        let valStr = isCurrency ? Math.abs(diff).toFixed(2) + '$' : (Number.isInteger(currentVal) ? Math.abs(Math.round(diff)) : Math.abs(diff).toFixed(1));
+        
+        el.innerHTML = `<span style="color: ${color};">${sign} ${valStr}</span>`;
+    };
+
+    if (prevS) {
+        const prevHours = (prevS["Minutes passées en stream"] || 0) / 60;
+        const prevAvgViewers = prevS["Spectateurs en moyenne"] || 0;
+        const prevFollows = prevS["Nouveaux followers"] || 0;
+        const prevSubs = prevS["Nouveaux subs"] || prevS["Abonnements payés au total"] || 0;
+        const prevRev = prevS._revTotal || 0;
+        const prevChatters = prevS["Personnes sur le chat"] || 0;
+        const prevMsgs = prevS["Messages du chat"] || 0;
+        const prevUniques = prevS["Spectateurs uniques"] || 0;
+        const prevRetention = prevUniques > 0 ? (prevAvgViewers / prevUniques) * 100 : 0;
+
+        renderDiff('ss-time-diff', hours, prevHours);
+        renderDiff('ss-viewers-diff', avgViewers, prevAvgViewers);
+        renderDiff('ss-follows-diff', follows, prevFollows);
+        renderDiff('ss-subs-diff', subs, prevSubs);
+        renderDiff('ss-rev-diff', rev, prevRev, true);
+        renderDiff('ss-chatters-diff', chatters, prevChatters);
+        renderDiff('ss-msgs-diff', msgs, prevMsgs);
+        renderDiff('ss-retention-diff', retention, prevRetention);
+    } else {
+        // Efface les différences si on est sur le tout premier stream de la liste
+        ['time', 'viewers', 'follows', 'subs', 'rev', 'chatters', 'msgs', 'retention'].forEach(k => {
+            let diffEl = document.getElementById(`ss-${k}-diff`);
+            if(diffEl) diffEl.innerHTML = '';
+        });
+    }
+
+    // 5. GESTION DE L'AFFICHAGE DES BOUTONS PRÉCÉDENT/SUIVANT
+    document.getElementById('btnPrevStream').style.opacity = currentStreamIndex === 0 ? "0.3" : "1";
+    document.getElementById('btnPrevStream').style.cursor = currentStreamIndex === 0 ? "default" : "pointer";
+    
+    document.getElementById('btnNextStream').style.opacity = currentStreamIndex === currentStreamList.length - 1 ? "0.3" : "1";
+    document.getElementById('btnNextStream').style.cursor = currentStreamIndex === currentStreamList.length - 1 ? "default" : "pointer";
+}
+
+
+function navigateStream(dir) {
+    if (currentStreamList.length === 0) return;
+    currentStreamIndex += dir;
+    if (currentStreamIndex < 0) currentStreamIndex = 0;
+    if (currentStreamIndex >= currentStreamList.length) currentStreamIndex = currentStreamList.length - 1;
+    updateStreamInspector();
+}
+
+
+async function callMammouthAI() {
+    const btn = document.getElementById('mammouthBtn'); 
+    const aiContainer = document.getElementById('aiInsights');
+    
+    btn.innerText = "CALCULS..."; 
+    btn.disabled = true;
+    
+    try {
+        if (!db || db.length === 0) throw new Error("Aucune donnée chargée.");
+
+        // 1. Fonction pour calculer les stats sur X jours
+        const getP = (days) => {
+            const end = db[db.length-1]._date; 
+            const start = new Date(end.getTime() - (days * 24 * 3600 * 1000));
+            const f = db.filter(d => d._date >= start && d["Minutes passées en stream"] > 0);
+            return f.length ? `Streams: ${f.length}, Moy: ${Math.round(f.reduce((a,b)=>a+(b["Spectateurs en moyenne"]||0),0)/f.length)}, Rev: ${f.reduce((a,b)=>a+(b._revTotal||0),0).toFixed(0)}$` : "N/A";
+        };
+
+        // 2. Récupération des 10 derniers streams individuels
+        const allStreams = db.filter(d => d["Minutes passées en stream"] > 0);
+        const last10Streams = allStreams.slice(-10).map(d => {
+            const dateStr = d._date ? d._date.toLocaleDateString('fr-FR') : "Date inconnue";
+            const hours = ((d["Minutes passées en stream"] || 0) / 60).toFixed(1);
+            const viewers = Math.round(d["Spectateurs en moyenne"] || 0);
+            const rev = (d._revTotal || 0).toFixed(1);
+            const follows = d["Nouveaux followers"] || 0;
+            return `[${dateStr}] ${hours}h, ${viewers} viewers, ${follows} follows, ${rev}$`;
+        }).join(" | ");
+
+        // 3. Construction des prompts
+        const systemPrompt = "Tu es Nebula AI, un coach stratégique Twitch. Réponds en HTML simple (uniquement <h3>, <p>, <ul>, <li>, <strong>). N'inclus AUCUNE balise <style>, <body> ou <html>. N'utilise STRICTEMENT AUCUN attribut 'style' ou de couleur. Ton texte s'intègre dans un dashboard sombre, structure bien tes parties.";
+        
+        const userPrompt = `
+            Voici les statistiques globales :
+            - 7j : ${getP(7)}
+            - 14j : ${getP(14)}
+            - 30j : ${getP(30)}
+            - 90j : ${getP(90)}
+            - 180j : ${getP(180)}
+            - 365j : ${getP(365)}
+            
+            10 derniers streams :
+            ${last10Streams}
+            
+            Fais une analyse en 2 parties : 
+            1. Dynamique Récente
+            2. Bilan Global
+        `;
+
+        // 4. Appel à l'API
+        const resp = await fetch("https://api.mammouth.ai/v1/chat/completions", { 
+            method: "POST", 
+            headers: { 
+                "Authorization": `Bearer ${MAMMOUTH_API_KEY}`, 
+                "Content-Type": "application/json" 
+            }, 
+            body: JSON.stringify({ 
+                model: MAMMOUTH_MODEL, 
+                messages: [
+                    {role: "system", content: systemPrompt}, 
+                    {role: "user", content: userPrompt}
+                ] 
+            }) 
+        });
+        
+        const data = await resp.json(); 
+        
+        // Gestion de l'erreur si l'API renvoie un message d'erreur (ex: plus de crédits)
+        if (data.error) {
+            throw new Error(data.error.message || "Erreur renvoyée par Mammouth AI");
+        }
+
+        // Si tout va bien
+        const cleanHTML = data.choices[0].message.content.replace(/ style="[^"]*"/gi, '');
+        aiContainer.innerHTML = cleanHTML;
+        
+    } catch(e) { 
+        console.error("Détail complet de l'erreur :", e);
+        aiContainer.innerHTML = `<p style='color:var(--accent-red)'>Erreur : ${e.message}</p>`; 
+    }
+    
+    btn.innerText = "LANCER ANALYSE"; 
+    btn.disabled = false;
+}
+
+</script>
+</body>
+</html>
