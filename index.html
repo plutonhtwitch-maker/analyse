@@ -739,28 +739,14 @@ function updateStreamInspector() {
         document.getElementById('ss-rev-hour').innerText = "0$/h";
         document.getElementById('ss-chatters').innerText = "0";
         document.getElementById('ss-msgs').innerText = "0";
-        document.getElementById('ss-retention').innerText = "0%";
+        document.getElementById('ss-retention').innerText = "0 min";
         
         // Nettoyage des différences
         ['time', 'viewers', 'follows', 'subs', 'rev', 'chatters', 'msgs', 'retention'].forEach(k => {
             let diffEl = document.getElementById(`ss-${k}-diff`);
             if(diffEl) diffEl.innerHTML = '';
         });
-        return;
-
-            // Synchronisation avec le graphique principal
-    if (typeof mainChart !== 'undefined' && mainChart !== null) {
-        // Force l'affichage du tooltip et du point sur le graphique
-        mainChart.setActiveElements([
-            { datasetIndex: 0, index: currentStreamIndex },
-            { datasetIndex: 1, index: currentStreamIndex }
-        ]);
-        mainChart.tooltip.setActiveElements([
-            { datasetIndex: 0, index: currentStreamIndex }
-        ], { x: 0, y: 0 });
-        mainChart.update();
-    }
-
+        return; // On s'arrête ici si pas de stream
     }
 
     // 2. RÉCUPÉRATION DES DONNÉES DU STREAM ACTUEL
@@ -769,7 +755,8 @@ function updateStreamInspector() {
     
     document.getElementById('streamTitle').innerText = `🔴 STREAM DU ${dateStr.toUpperCase()}`;
     
-    const hours = (s["Minutes passées en stream"] || 0) / 60;
+    const streamMinutes = s["Minutes passées en stream"] || 0;
+    const hours = streamMinutes / 60;
     const avgViewers = s["Spectateurs en moyenne"] || 0;
     const maxViewers = s["Spectateurs max."] || 0;
     const follows = s["Nouveaux followers"] || 0;
@@ -778,7 +765,9 @@ function updateStreamInspector() {
     const chatters = s["Personnes sur le chat"] || 0;
     const uniques = s["Spectateurs uniques"] || 0;
     const msgs = s["Messages du chat"] || 0;
-    const retention = uniques > 0 ? (avgViewers / uniques) * 100 : 0;
+    
+    // NOUVEAU CALCUL : Rétention en minutes
+    const retention = uniques > 0 ? (avgViewers * streamMinutes) / uniques : 0;
 
     // 3. AFFICHAGE DES VALEURS PRINCIPALES
     document.getElementById('ss-time').innerText = hours.toFixed(1) + "h";
@@ -790,7 +779,7 @@ function updateStreamInspector() {
     document.getElementById('ss-rev-hour').innerText = hours > 0 ? (rev/hours).toFixed(2) + "$ / heure" : "0$ / heure";
     document.getElementById('ss-chatters').innerText = chatters;
     document.getElementById('ss-msgs').innerText = msgs;
-    document.getElementById('ss-retention').innerText = retention.toFixed(1) + "%";
+    document.getElementById('ss-retention').innerText = retention.toFixed(1) + " min";
 
     // 4. CALCUL ET AFFICHAGE DES DIFFÉRENCES AVEC LE STREAM PRÉCÉDENT
     const prevS = currentStreamIndex > 0 ? currentStreamList[currentStreamIndex - 1] : null;
@@ -814,7 +803,8 @@ function updateStreamInspector() {
     };
 
     if (prevS) {
-        const prevHours = (prevS["Minutes passées en stream"] || 0) / 60;
+        const prevStreamMinutes = prevS["Minutes passées en stream"] || 0;
+        const prevHours = prevStreamMinutes / 60;
         const prevAvgViewers = prevS["Spectateurs en moyenne"] || 0;
         const prevFollows = prevS["Nouveaux followers"] || 0;
         const prevSubs = prevS["Nouveaux subs"] || prevS["Abonnements payés au total"] || 0;
@@ -822,7 +812,9 @@ function updateStreamInspector() {
         const prevChatters = prevS["Personnes sur le chat"] || 0;
         const prevMsgs = prevS["Messages du chat"] || 0;
         const prevUniques = prevS["Spectateurs uniques"] || 0;
-        const prevRetention = prevUniques > 0 ? (prevAvgViewers / prevUniques) * 100 : 0;
+        
+        // NOUVEAU CALCUL PRÉCÉDENT : Rétention en minutes
+        const prevRetention = prevUniques > 0 ? (prevAvgViewers * prevStreamMinutes) / prevUniques : 0;
 
         renderDiff('ss-time-diff', hours, prevHours);
         renderDiff('ss-viewers-diff', avgViewers, prevAvgViewers);
@@ -846,7 +838,20 @@ function updateStreamInspector() {
     
     document.getElementById('btnNextStream').style.opacity = currentStreamIndex === currentStreamList.length - 1 ? "0.3" : "1";
     document.getElementById('btnNextStream').style.cursor = currentStreamIndex === currentStreamList.length - 1 ? "default" : "pointer";
+
+    // 6. SYNCHRONISATION AVEC LE GRAPHIQUE PRINCIPAL (Remis à sa bonne place !)
+    if (typeof mainChart !== 'undefined' && mainChart !== null) {
+        mainChart.setActiveElements([
+            { datasetIndex: 0, index: currentStreamIndex },
+            { datasetIndex: 1, index: currentStreamIndex }
+        ]);
+        mainChart.tooltip.setActiveElements([
+            { datasetIndex: 0, index: currentStreamIndex }
+        ], { x: 0, y: 0 });
+        mainChart.update();
+    }
 }
+
 
 
 function navigateStream(dir) {
