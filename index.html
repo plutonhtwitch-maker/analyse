@@ -348,27 +348,135 @@ complete: (res) => {
         charts.main = new Chart(ctx, { type: 'line', data: { labels, datasets }, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: true, labels: { color: '#fff', font: { family: 'Orbitron', size: 10 } } } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#00e5ff' } }, y1: { display: mB !== 'none', position: 'right', grid: { display: false }, ticks: { color: '#9146FF' } }, x: { ticks: { color: '#666' } } } } });
     }
 
-    function renderMonthlyTrend() {
-        const ctx = document.getElementById('monthlyChart').getContext('2d');
-        if(charts.monthly) charts.monthly.destroy();
-        const metric = document.getElementById('monthlyMetric').value;
-        const isAvg = METRICS_DICT[metric].isAverage;
-        const groups = {};
-        db.forEach(d => {
-            const id = d._date.getFullYear() + "-" + d._date.getMonth();
-            if(!groups[id]) groups[id] = { val: 0, count: 0, date: d._date };
-            if(d["Minutes passées en stream"] > 0) { groups[id].val += d[metric] || 0; groups[id].count++; }
-        });
-        const lastKeys = Object.keys(groups).sort().slice(-12);
-        const currentData = lastKeys.map(k => isAvg ? (groups[k].count ? groups[k].val/groups[k].count : 0) : groups[k].val);
-        const labels = lastKeys.map(k => groups[k].date.toLocaleString('fr-FR', {month:'short', year:'2-digit'}));
-        const prevYearData = lastKeys.map(k => {
-            const d = groups[k].date; const prevId = (d.getFullYear()-1) + "-" + d.getMonth();
-            if(!groups[prevId]) return 0;
-            return isAvg ? (groups[prevId].count ? groups[prevId].val/groups[prevId].count : 0) : groups[prevId].val;
-        });
-        charts.monthly = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Actuel', data: currentData, backgroundColor: '#00e5ff', borderRadius: 4 }, { label: 'Année-1', data: prevYearData, backgroundColor: 'rgba(145, 70, 255, 0.4)', borderRadius: 4 }]}, options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } } } } });
+function renderMonthlyTrend() {
+    const canvas = document.getElementById('monthlyChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if(charts.monthly) charts.monthly.destroy();
+
+    const key = document.getElementById('monthlyMetric').value;
+    const groups = {};
+
+    // --- LISTE DE FORCE ---
+    // On définit strictement ce qui doit être ADDITIONNÉ (Somme totale du mois)
+    const forceSum = [
+        "Nouveaux followers", 
+        "Nouveaux subs", 
+        "_revTotal", 
+        "Revenu issu des abonnements",
+        "Revenu Prime",
+        "Revenus issus des abonnements offerts",
+        "Revenu des Bits",
+        "Revenu issu de la publicité",
+        "Minutes passées en stream",
+        "Vues live",
+        "Messages du chat"
+    ];
+
+    // On définit ce qui est un état (Cumul)
+    const isSnapshot = (key === "Cumul followers" || key === "Subs actifs");
+    
+    // On définit ce qui est une MOYENNE (Viewers)
+    // Tout ce qui n'est pas dans forceSum ou Snapshot sera une moyenne par défaut
+    const isSum = forceSum.includes(key);
+
+    // 1. Groupement des données
+    db.forEach(d => {
+        const mKey = d._date.getFullYear() + '-' + String(d._date.getMonth() + 1).padStart(2, '0');
+        const mLabel = d._date.toLocaleString('fr-FR', { month: 'short', year: '2-digit' });
+
+        if (!groups[mKey]) {
+            groups[mKey] = { label: mLabel, sum: 0, count: 0, lastVal: 0, lastDate: new Date(0) };
+        }
+
+        // On nettoie la valeur (Twitch met parfois des virgules ou des espaces)
+        let val = d[key];
+        if (typeof val === 'string') val = parseFloat(val.replace(',', '.').replace(/\s/g, ''));
+        val = parseFloat(val) || 0;
+
+        if (isSnapshot) {
+            // MODE CUMUL
+            if (d._date >= groups[mKey].lastDate) {
+                groups[mKey].lastVal = val;
+                groups[mKey].lastDate = d._date;
+            }
+        } else if (isSum) {
+            // MODE SOMME (Followers, etc.) : ON PREND TOUT LE MONDE SANS CONDITIONS
+            groups[mKey].sum += val;
+            groups[mKey].count = 1; // Pas de division
+        } else {
+            // MODE MOYENNE (Spectateurs) : Uniquement les jours avec stream
+            if (parseFloat(d["Minutes passées en stream"]) > 0) {
+                groups[mKey].sum += val;
+                groups[mKey].count++;
+            }
+        }
+    });
+
+    // 2. Préparation des axes (12 derniers mois)
+    const sortedKeys = Object.keys(groups).sort().slice(-12);
+    
+    const getFinalVal = (mKey) => {
+        const g = groups[mKey];
+        if (!g) return 0;
+        if (isSnapshot) return g.lastVal;
+        return (g.count > 0) ? g.sum / g.count : 0;
+    };
+
+    const dataActual = sortedKeys.map(k => getFinalVal(k));
+    const dataPrev = sortedKeys.map(k => {
+        const [y, m] = k.split('-');
+        const prevKey = (parseInt(y) - 1) + '-' + m;
+        return getFinalVal(prevKey);
+    });
+
+    // 3. Graphique
+    charts.monthly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: sortedKeys.map(k => groups[k].label),
+            datasets: [
+                { label: 'Actuel', data: dataActual, backgroundColor: '#00e5ff', borderRadius: 4, barPercentage: 0.7 },
+                { label: 'Année-1', data: dataPrev, backgroundColor: 'rgba(145, 70, 255, 0.3)', borderRadius: 4, barPercentage: 0.7 }
+            ]
+        },
+        // ... dans renderMonthlyTrend, à l'intérieur de charts.monthly = new Chart(...)
+        options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+        mode: 'index',      // Sélectionne tous les éléments de la colonne (Actuel + Année-1)
+        intersect: false,   // Pas besoin d'être sur la barre pour activer
+    },
+    plugins: {
+        legend: { display: false },
+        tooltip: {
+            enabled: true,
+            backgroundColor: 'rgba(10, 10, 15, 0.9)',
+            titleFont: { family: 'Orbitron' },
+            bodyFont: { family: 'Inter' },
+            padding: 12,
+            borderColor: 'rgba(145, 70, 255, 0.3)',
+            borderWidth: 1,
+            callbacks: {
+                label: (c) => ` ${c.dataset.label}: ${c.raw.toLocaleString('fr-FR', {maximumFractionDigits: isSum ? 0 : 1})}`
+            }
+        }
+    },
+    scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#666', font: { size: 10 } } },
+        x: { grid: { display: false }, ticks: { color: '#666', font: { size: 10 } } }
     }
+}
+
+    });
+}
+
+
+
+
+
+
 
    function renderRevenuePie(data) {
     const ctx = document.getElementById('revenuePie').getContext('2d');
