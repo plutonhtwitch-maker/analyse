@@ -360,21 +360,91 @@
         document.getElementById('heatmap').innerHTML = html + '</div>';
     }
 
-    async function callMammouthAI() {
-        const btn = document.getElementById('mammouthBtn'); const aiContainer = document.getElementById('aiInsights');
-        btn.innerText = "CALCULS..."; btn.disabled = true;
+async function callMammouthAI() {
+    const btn = document.getElementById('mammouthBtn'); 
+    const aiContainer = document.getElementById('aiInsights');
+    
+    btn.innerText = "CALCULS..."; 
+    btn.disabled = true;
+    
+    try {
+        if (!db || db.length === 0) throw new Error("Aucune donnée chargée.");
+
+        // 1. Fonction pour calculer les stats sur X jours
         const getP = (days) => {
-            const end = db[db.length-1]._date; const start = new Date(end.getTime() - (days * 24 * 3600 * 1000));
+            const end = db[db.length-1]._date; 
+            const start = new Date(end.getTime() - (days * 24 * 3600 * 1000));
             const f = db.filter(d => d._date >= start && d["Minutes passées en stream"] > 0);
-            return f.length ? `Streams: ${f.length}, Moy: ${Math.round(f.reduce((a,b)=>a+b["Spectateurs en moyenne"],0)/f.length)}, Rev: ${f.reduce((a,b)=>a+b._revTotal,0).toFixed(0)}$` : "N/A";
+            return f.length ? `Streams: ${f.length}, Moy: ${Math.round(f.reduce((a,b)=>a+(b["Spectateurs en moyenne"]||0),0)/f.length)}, Rev: ${f.reduce((a,b)=>a+(b._revTotal||0),0).toFixed(0)}$` : "N/A";
         };
-        const prompt = `Analyste Strategique: 7j: ${getP(7)} | 30j: ${getP(30)} | 365j: ${getP(365)}. Donne un diagnostic en HTML simple.`;
-        try {
-            const resp = await fetch("https://api.mammouth.ai/v1/chat/completions", { method: "POST", headers: { "Authorization": `Bearer ${MAMMOUTH_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: MAMMOUTH_MODEL, messages: [{role:"system", content:"Tu es Nebula AI. Réponds en HTML."}, {role:"user", content:prompt}] }) });
-            const data = await resp.json(); aiContainer.innerHTML = data.choices[0].message.content;
-        } catch(e) { aiContainer.innerHTML = "Erreur API."; }
-        btn.innerText = "LANCER ANALYSE"; btn.disabled = false;
+
+        // 2. Récupération des 10 derniers streams individuels
+        const allStreams = db.filter(d => d["Minutes passées en stream"] > 0);
+        const last10Streams = allStreams.slice(-10).map(d => {
+            const dateStr = d._date ? d._date.toLocaleDateString('fr-FR') : "Date inconnue";
+            const hours = ((d["Minutes passées en stream"] || 0) / 60).toFixed(1);
+            const viewers = Math.round(d["Spectateurs en moyenne"] || 0);
+            const rev = (d._revTotal || 0).toFixed(1);
+            const follows = d["Nouveaux followers"] || 0;
+            return `[${dateStr}] ${hours}h, ${viewers} viewers, ${follows} follows, ${rev}$`;
+        }).join(" | ");
+
+        // 3. Construction des prompts
+        const systemPrompt = "Tu es Nebula AI, un coach stratégique Twitch. Réponds en HTML simple (uniquement <h3>, <p>, <ul>, <li>, <strong>). N'inclus AUCUNE balise <style>, <body> ou <html>. N'utilise STRICTEMENT AUCUN attribut 'style' ou de couleur. Ton texte s'intègre dans un dashboard sombre, structure bien tes parties.";
+        
+        const userPrompt = `
+            Voici les statistiques globales :
+            - 7j : ${getP(7)}
+            - 14j : ${getP(14)}
+            - 30j : ${getP(30)}
+            - 90j : ${getP(90)}
+            - 180j : ${getP(180)}
+            - 365j : ${getP(365)}
+            
+            10 derniers streams :
+            ${last10Streams}
+            
+            Fais une analyse en 2 parties : 
+            1. Dynamique Récente
+            2. Bilan Global
+        `;
+
+        // 4. Appel à l'API
+        const resp = await fetch("https://api.mammouth.ai/v1/chat/completions", { 
+            method: "POST", 
+            headers: { 
+                "Authorization": `Bearer ${MAMMOUTH_API_KEY}`, 
+                "Content-Type": "application/json" 
+            }, 
+            body: JSON.stringify({ 
+                model: MAMMOUTH_MODEL, 
+                messages: [
+                    {role: "system", content: systemPrompt}, 
+                    {role: "user", content: userPrompt}
+                ] 
+            }) 
+        });
+        
+        const data = await resp.json(); 
+        
+        // Gestion de l'erreur si l'API renvoie un message d'erreur (ex: plus de crédits)
+        if (data.error) {
+            throw new Error(data.error.message || "Erreur renvoyée par Mammouth AI");
+        }
+
+        // Si tout va bien
+        const cleanHTML = data.choices[0].message.content.replace(/ style="[^"]*"/gi, '');
+        aiContainer.innerHTML = cleanHTML;
+        
+    } catch(e) { 
+        console.error("Détail complet de l'erreur :", e);
+        aiContainer.innerHTML = `<p style='color:var(--accent-red)'>Erreur : ${e.message}</p>`; 
     }
+    
+    btn.innerText = "LANCER ANALYSE"; 
+    btn.disabled = false;
+}
+
 </script>
 </body>
 </html>
