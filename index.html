@@ -344,8 +344,17 @@ complete: (res) => {
     function setTimeRange(days, btn) {
         const end = db[db.length-1]._date;
         const start = days === 'all' ? db[0]._date : new Date(end.getTime() - (days * 24 * 3600 * 1000));
-        document.getElementById('dateStart').valueAsDate = start;
-        document.getElementById('dateEnd').valueAsDate = end;
+        
+        // Petite fonction secrète pour esquiver le bug du fuseau horaire
+        const toYMD = (d) => {
+            return d.getFullYear() + "-" + 
+                   String(d.getMonth() + 1).padStart(2, '0') + "-" + 
+                   String(d.getDate()).padStart(2, '0');
+        };
+
+        document.getElementById('dateStart').value = toYMD(start);
+        document.getElementById('dateEnd').value = toYMD(end);
+        
         if(btn) { document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
         refresh();
     }
@@ -353,11 +362,23 @@ complete: (res) => {
     function shiftRange(dir) {
         const s = document.getElementById('dateStart').valueAsDate;
         const e = document.getElementById('dateEnd').valueAsDate;
+        if(!s || !e) return;
+
         const diff = (e - s) || (30 * 24 * 3600 * 1000);
-        document.getElementById('dateStart').valueAsDate = new Date(s.getTime() + diff * dir);
-        document.getElementById('dateEnd').valueAsDate = new Date(e.getTime() + diff * dir);
+        const newS = new Date(s.getTime() + diff * dir);
+        const newE = new Date(e.getTime() + diff * dir);
+
+        const toYMD = (d) => {
+            return d.getFullYear() + "-" + 
+                   String(d.getMonth() + 1).padStart(2, '0') + "-" + 
+                   String(d.getDate()).padStart(2, '0');
+        };
+
+        document.getElementById('dateStart').value = toYMD(newS);
+        document.getElementById('dateEnd').value = toYMD(newE);
         refresh();
     }
+
 
     function refresh() {
         const dS = document.getElementById('dateStart').valueAsDate;
@@ -947,6 +968,16 @@ async function callMammouthAI() {
     btn.innerText = "LANCER ANALYSE"; 
     btn.disabled = false;
 }
+
+// --- METTRE LA DATE DU JOUR PAR DÉFAUT AU CHARGEMENT ---
+document.addEventListener("DOMContentLoaded", () => {
+    const dateEndInput = document.getElementById('dateEnd');
+    if (dateEndInput) {
+        // Applique la date d'aujourd'hui automatiquement
+        dateEndInput.valueAsDate = new Date(); 
+    }
+});
+
 
 </script>
 </body>
