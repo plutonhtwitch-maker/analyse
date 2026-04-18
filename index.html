@@ -101,71 +101,127 @@
             <div id="activeDateRange" style="font-size: 0.8rem; font-family:'Orbitron'; color: var(--twitch-purple);">ANALYSIS ACTIVE</div>
         </div>
 
-                        <!-- NOUVEAU BLOC : INSPECTEUR DE STREAM -->
-            <div class="stream-inspector" style="grid-column: 1 / -1; background: linear-gradient(180deg, #0a0a0f 0%, #12121a 100%); border-top: 2px solid var(--accent-blue); padding: 20px; border-radius: 12px; margin-top: 15px;">
+  <!-- NOUVEAU BLOC : INSPECTEUR DE STREAM -->
+<div class="stream-inspector" style="grid-column: 1 / -1; background: linear-gradient(180deg, #0a0a0f 0%, #12121a 100%); border-top: 2px solid var(--accent-blue); padding: 20px; border-radius: 12px; margin-top: 15px;">
+    <div class="chart-header"><div class="chart-title">🔎 INSPECTEUR DE STREAM (LIVE PAR LIVE)</div></div>
+    
+    <!-- HEADER AVEC BOUTONS -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <button id="btnPrevStream" onclick="navigateStream(-1)" style="background: var(--bg-card); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron';">&#9664; PRÉCÉDENT</button>
+        <div id="streamTitle" style="font-family: 'Orbitron'; font-size: 1.2rem; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.2);">SÉLECTIONNEZ UNE PÉRIODE</div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="btnNextStream" onclick="navigateStream(1)" style="background: var(--bg-card); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron';">SUIVANT &#9654;</button>
+            <button id="btnToggleDetails" onclick="toggleStreamDetails()" style="background: var(--bg-card); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron'; transition: 0.3s;">▼ PLUS D'INFOS</button>
 
-                <div class="chart-header"><div class="chart-title">🔎 INSPECTEUR DE STREAM (LIVE PAR LIVE)</div></div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                   <button id="btnPrevStream" onclick="navigateStream(-1)" style="background: var(--bg-card); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron';">&#9664; PRÉCÉDENT</button>
-<div id="streamTitle" style="font-family: 'Orbitron'; font-size: 1.2rem; color: #fff; text-shadow: 0 0 10px rgba(255,255,255,0.2);">SÉLECTIONNEZ UNE PÉRIODE</div>
-<button id="btnNextStream" onclick="navigateStream(1)" style="background: var(--bg-card); color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron';">SUIVANT &#9654;</button>
+        </div>
+    </div>
 
-                </div>
-                                <!-- GRILLE 8 COLONNES -->
-                                <!-- GRILLE 8 COLONNES -->
-                <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px;">
-                    
-                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
-                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Temps de Live</div>
-                        <div><span id="ss-time" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0h</span></div>
-                        <span id="ss-time-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
-                    </div>
+    <!-- LIGNE 1 : MODE MINIMAL (Toujours visible) -->
+    <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; margin-bottom: 10px;">
+        
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Temps de live</div>
+            <div><span id="ss-time" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0h</span></div>
+            <span id="ss-time-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
 
-                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
-                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Viewers Moy.</div>
-                        <div><span id="ss-viewers" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
-                        <div id="ss-viewers-max" style="font-size: 0.7rem; color: var(--twitch-purple); margin-top: 2px;">Max: 0</div>
-                        <span id="ss-viewers-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
-                    </div>
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Viewers Moy.</div>
+            <div><span id="ss-viewers" style="font-size: 1.1rem; font-weight: bold; color: #fff; font-family: 'Orbitron';">0</span></div>
+            <div id="ss-viewers-max" style="font-size: 0.7rem; color: var(--twitch-purple); margin-top: 2px;">Max: 0</div>
+            <span id="ss-viewers-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
 
-                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
-                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nouveaux Followers</div>
-                        <div><span id="ss-follows" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">+0</span></div>
-                        <span id="ss-follows-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
-                    </div>
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Nouveaux Followers</div>
+            <div><span id="ss-follows" style="font-size: 1.1rem; font-weight: bold; color: #fff; font-family: 'Orbitron';">+0</span></div>
+            <span id="ss-follows-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
 
-                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
-                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Nouveaux Subs</div>
-                        <div><span id="ss-subs" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">+0</span></div>
-                        <span id="ss-subs-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
-                    </div>
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Nouveaux Subs</div>
+            <div><span id="ss-subs" style="font-size: 1.1rem; font-weight: bold; color: #fff; font-family: 'Orbitron';">+0</span></div>
+            <span id="ss-subs-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
 
-                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
-                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Revenus</div>
-                        <div><span id="ss-rev" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0.00$</span></div>
-                        <div id="ss-rev-hour" style="font-size: 0.7rem; color: var(--twitch-purple); margin-top: 2px;">0$/h</div>
-                        <span id="ss-rev-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
-                    </div>
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Revenus</div>
+            <div><span id="ss-rev" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0.00$</span></div>
+            <div id="ss-rev-hour" style="font-size: 0.7rem; color: var(--twitch-purple); margin-top: 2px;">0$/h</div>
+            <span id="ss-rev-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
 
-                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
-                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Chatters Uniques</div>
-                        <div><span id="ss-chatters" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
-                        <span id="ss-chatters-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
-                    </div>
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Chatters Uniques</div>
+            <div><span id="ss-chatters" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+            <span id="ss-chatters-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
 
-                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
-                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Messages Chat</div>
-                        <div><span id="ss-msgs" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
-                        <span id="ss-msgs-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
-                    </div>
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Messages Chat</div>
+            <div><span id="ss-msgs" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+            <span id="ss-msgs-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
 
-                    <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-start;">
-                        <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Rétention</div>
-                        <div><span id="ss-retention" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0%</span></div>
-                        <span id="ss-retention-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
-                    </div>
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Rétention</div>
+            <div><span id="ss-retention" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0 min</span></div>
+            <span id="ss-retention-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
+    </div>
 
-                </div>
+    <!-- LIGNE 2 : MODE AVANCÉ (Cachée par défaut) -->
+    <div id="streamDetailsRow" style="display: none; grid-template-columns: repeat(8, 1fr); gap: 10px; margin-bottom: 20px;">
+        
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Vues Live (Clics)</div>
+            <div><span id="ss-liveviews" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+            <span id="ss-liveviews-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
+
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Viewers Uniques</div>
+            <div><span id="ss-uniques" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+            <span id="ss-uniques-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
+
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Viewers Impliqués</div>
+            <div><span id="ss-engaged" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+            <span id="ss-engaged-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
+
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Vues de Clips</div>
+            <div><span id="ss-clips" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+            <span id="ss-clips-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
+
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Revenus Pubs</div>
+            <div><span id="ss-adrev" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0.00$</span></div>
+            <span id="ss-adrev-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
+
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Revenus Bits</div>
+            <div><span id="ss-bitsrev" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0.00$</span></div>
+            <span id="ss-bitsrev-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
+
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">Subs Offerts</div>
+            <div><span id="ss-gifts" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0</span></div>
+            <span id="ss-gifts-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
+
+        <div style="position: relative; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column;">
+            <div style="font-size: 0.6rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; white-space: nowrap; overflow: hidden;">% Raid/Host</div>
+            <div><span id="ss-raid" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0%</span></div>
+            <span id="ss-raid-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
+        </div>
+    </div>
+
 
 
 
@@ -748,6 +804,8 @@ function renderDayChart(data) {
     });
 }
 function updateStreamInspector() {
+    const keysToReset = ['time', 'viewers', 'follows', 'subs', 'rev', 'chatters', 'msgs', 'retention', 'liveviews', 'uniques', 'engaged', 'clips', 'adrev', 'bitsrev', 'gifts', 'raid'];
+
     // 1. GESTION S'IL N'Y A AUCUN STREAM
     if (currentStreamList.length === 0) {
         document.getElementById('streamTitle').innerText = "AUCUN STREAM TROUVÉ";
@@ -761,13 +819,20 @@ function updateStreamInspector() {
         document.getElementById('ss-chatters').innerText = "0";
         document.getElementById('ss-msgs').innerText = "0";
         document.getElementById('ss-retention').innerText = "0 min";
+        document.getElementById('ss-liveviews').innerText = "0";
+        document.getElementById('ss-uniques').innerText = "0";
+        document.getElementById('ss-engaged').innerText = "0";
+        document.getElementById('ss-clips').innerText = "0";
+        document.getElementById('ss-adrev').innerText = "0.00$";
+        document.getElementById('ss-bitsrev').innerText = "0.00$";
+        document.getElementById('ss-gifts').innerText = "0";
+        document.getElementById('ss-raid').innerText = "0%";
         
-        // Nettoyage des différences
-        ['time', 'viewers', 'follows', 'subs', 'rev', 'chatters', 'msgs', 'retention'].forEach(k => {
+        keysToReset.forEach(k => {
             let diffEl = document.getElementById(`ss-${k}-diff`);
             if(diffEl) diffEl.innerHTML = '';
         });
-        return; // On s'arrête ici si pas de stream
+        return; 
     }
 
     // 2. RÉCUPÉRATION DES DONNÉES DU STREAM ACTUEL
@@ -776,6 +841,7 @@ function updateStreamInspector() {
     
     document.getElementById('streamTitle').innerText = `${dateStr.toUpperCase()}`;
     
+    // Ligne 1
     const streamMinutes = s["Minutes passées en stream"] || 0;
     const hours = streamMinutes / 60;
     const avgViewers = s["Spectateurs en moyenne"] || 0;
@@ -786,68 +852,80 @@ function updateStreamInspector() {
     const chatters = s["Personnes sur le chat"] || 0;
     const uniques = s["Spectateurs uniques"] || 0;
     const msgs = s["Messages du chat"] || 0;
-    
-    // NOUVEAU CALCUL : Rétention en minutes
     const retention = uniques > 0 ? (avgViewers * streamMinutes) / uniques : 0;
+    
+    // Ligne 2
+    const liveViews = s["Vues live"] || 0;
+    const engaged = s["Viewers impliqués"] || 0;
+    const clips = s["Visionnements clips"] || 0;
+    const adRev = s["Revenu issu de la publicité"] || 0;
+    const bitsRev = s["Revenu des Bits"] || 0;
+    const gifts = s["Abonnements offerts au total"] || 0;
+    const raidPct = s["Spectateurs d'hébergements et de raids (%)"] || 0;
 
     // 3. AFFICHAGE DES VALEURS PRINCIPALES
-    document.getElementById('ss-time').innerText = hours.toFixed(1) + "h";
+    document.getElementById('ss-time').innerText = hours.toFixed(1) + 'h';
     document.getElementById('ss-viewers').innerText = Math.round(avgViewers);
-    document.getElementById('ss-viewers-max').innerText = `Max: ${maxViewers}`;
-    document.getElementById('ss-follows').innerText = `+${follows}`;
-    document.getElementById('ss-subs').innerText = `+${subs}`;
-    document.getElementById('ss-rev').innerText = rev.toFixed(2) + "$";
-    document.getElementById('ss-rev-hour').innerText = hours > 0 ? (rev/hours).toFixed(2) + "$ / heure" : "0$ / heure";
+    document.getElementById('ss-viewers-max').innerText = `Max: ${Math.round(maxViewers)}`;
+    document.getElementById('ss-follows').innerText = (follows >= 0 ? '+' : '') + follows;
+    document.getElementById('ss-subs').innerText = (subs >= 0 ? '+' : '') + subs;
+    document.getElementById('ss-rev').innerText = rev.toFixed(2) + '$';
+    document.getElementById('ss-rev-hour').innerText = (hours > 0 ? (rev / hours).toFixed(2) : 0) + '$/heure';
     document.getElementById('ss-chatters').innerText = chatters;
     document.getElementById('ss-msgs').innerText = msgs;
-    document.getElementById('ss-retention').innerText = retention.toFixed(1) + " min";
+    document.getElementById('ss-retention').innerText = retention.toFixed(1) + ' min';
+    
+    document.getElementById('ss-liveviews').innerText = liveViews;
+    document.getElementById('ss-uniques').innerText = uniques;
+    document.getElementById('ss-engaged').innerText = engaged;
+    document.getElementById('ss-clips').innerText = clips;
+    document.getElementById('ss-adrev').innerText = adRev.toFixed(2) + '$';
+    document.getElementById('ss-bitsrev').innerText = bitsRev.toFixed(2) + '$';
+    document.getElementById('ss-gifts').innerText = gifts;
+    document.getElementById('ss-raid').innerText = raidPct.toFixed(1) + '%';
 
     // 4. CALCUL ET AFFICHAGE DES DIFFÉRENCES AVEC LE STREAM PRÉCÉDENT
     const prevS = currentStreamIndex > 0 ? currentStreamList[currentStreamIndex - 1] : null;
 
-    const renderDiff = (id, currentVal, prevVal, isCurrency = false) => {
+    const renderDiff = (id, currentVal, prevVal, isCurrency = false, isPct = false) => {
         const el = document.getElementById(id);
-        if (!el) return;
-        if (!prevS) { el.innerHTML = ""; return; }
-        
+        if(!el) return;
+        if (currentVal === prevVal) { el.innerHTML = ''; return; }
         const diff = currentVal - prevVal;
-        if (Math.abs(diff) < 0.01) { 
-            el.innerHTML = '<span style="color: rgba(255,255,255,0.3);">=</span>'; 
-            return; 
-        }
-
-        const color = diff > 0 ? 'rgba(0, 255, 163, 0.8)' : 'rgba(255, 79, 77, 0.8)'; // Vert ou Rouge discret
+        const color = diff > 0 ? 'rgba(0, 255, 163, 0.8)' : 'rgba(255, 79, 77, 0.8)';
         const sign = diff > 0 ? '▲' : '▼';
-        let valStr = isCurrency ? Math.abs(diff).toFixed(2) + '$' : (Number.isInteger(currentVal) ? Math.abs(Math.round(diff)) : Math.abs(diff).toFixed(1));
-        
+        let valStr = isCurrency ? Math.abs(diff).toFixed(2) + '$' : 
+                     isPct ? Math.abs(diff).toFixed(1) + '%' : 
+                     (Number.isInteger(currentVal) ? Math.abs(Math.round(diff)) : Math.abs(diff).toFixed(1));
         el.innerHTML = `<span style="color: ${color};">${sign} ${valStr}</span>`;
     };
 
     if (prevS) {
-        const prevStreamMinutes = prevS["Minutes passées en stream"] || 0;
-        const prevHours = prevStreamMinutes / 60;
-        const prevAvgViewers = prevS["Spectateurs en moyenne"] || 0;
-        const prevFollows = prevS["Nouveaux followers"] || 0;
-        const prevSubs = prevS["Nouveaux subs"] || prevS["Abonnements payés au total"] || 0;
-        const prevRev = prevS._revTotal || 0;
-        const prevChatters = prevS["Personnes sur le chat"] || 0;
-        const prevMsgs = prevS["Messages du chat"] || 0;
-        const prevUniques = prevS["Spectateurs uniques"] || 0;
-        
-        // NOUVEAU CALCUL PRÉCÉDENT : Rétention en minutes
-        const prevRetention = prevUniques > 0 ? (prevAvgViewers * prevStreamMinutes) / prevUniques : 0;
+        const pStreamMinutes = prevS["Minutes passées en stream"] || 0;
+        const pHours = pStreamMinutes / 60;
+        const pUniques = prevS["Spectateurs uniques"] || 0;
+        const pAvgViewers = prevS["Spectateurs en moyenne"] || 0;
+        const pRetention = pUniques > 0 ? (pAvgViewers * pStreamMinutes) / pUniques : 0;
 
-        renderDiff('ss-time-diff', hours, prevHours);
-        renderDiff('ss-viewers-diff', avgViewers, prevAvgViewers);
-        renderDiff('ss-follows-diff', follows, prevFollows);
-        renderDiff('ss-subs-diff', subs, prevSubs);
-        renderDiff('ss-rev-diff', rev, prevRev, true);
-        renderDiff('ss-chatters-diff', chatters, prevChatters);
-        renderDiff('ss-msgs-diff', msgs, prevMsgs);
-        renderDiff('ss-retention-diff', retention, prevRetention);
+        renderDiff('ss-time-diff', hours, pHours);
+        renderDiff('ss-viewers-diff', avgViewers, pAvgViewers);
+        renderDiff('ss-follows-diff', follows, prevS["Nouveaux followers"] || 0);
+        renderDiff('ss-subs-diff', subs, prevS["Nouveaux subs"] || prevS["Abonnements payés au total"] || 0);
+        renderDiff('ss-rev-diff', rev, prevS._revTotal || 0, true);
+        renderDiff('ss-chatters-diff', chatters, prevS["Personnes sur le chat"] || 0);
+        renderDiff('ss-msgs-diff', msgs, prevS["Messages du chat"] || 0);
+        renderDiff('ss-retention-diff', retention, pRetention);
+
+        renderDiff('ss-liveviews-diff', liveViews, prevS["Vues live"] || 0);
+        renderDiff('ss-uniques-diff', uniques, pUniques);
+        renderDiff('ss-engaged-diff', engaged, prevS["Viewers impliqués"] || 0);
+        renderDiff('ss-clips-diff', clips, prevS["Visionnements clips"] || 0);
+        renderDiff('ss-adrev-diff', adRev, prevS["Revenu issu de la publicité"] || 0, true);
+        renderDiff('ss-bitsrev-diff', bitsRev, prevS["Revenu des Bits"] || 0, true);
+        renderDiff('ss-gifts-diff', gifts, prevS["Abonnements offerts au total"] || 0);
+        renderDiff('ss-raid-diff', raidPct, prevS["Spectateurs d'hébergements et de raids (%)"] || 0, false, true);
     } else {
-        // Efface les différences si on est sur le tout premier stream de la liste
-        ['time', 'viewers', 'follows', 'subs', 'rev', 'chatters', 'msgs', 'retention'].forEach(k => {
+        keysToReset.forEach(k => {
             let diffEl = document.getElementById(`ss-${k}-diff`);
             if(diffEl) diffEl.innerHTML = '';
         });
@@ -856,11 +934,10 @@ function updateStreamInspector() {
     // 5. GESTION DE L'AFFICHAGE DES BOUTONS PRÉCÉDENT/SUIVANT
     document.getElementById('btnPrevStream').style.opacity = currentStreamIndex === 0 ? "0.3" : "1";
     document.getElementById('btnPrevStream').style.cursor = currentStreamIndex === 0 ? "default" : "pointer";
-    
     document.getElementById('btnNextStream').style.opacity = currentStreamIndex === currentStreamList.length - 1 ? "0.3" : "1";
     document.getElementById('btnNextStream').style.cursor = currentStreamIndex === currentStreamList.length - 1 ? "default" : "pointer";
 
-    // 6. SYNCHRONISATION AVEC LE GRAPHIQUE PRINCIPAL (Remis à sa bonne place !)
+    // 6. SYNCHRONISATION AVEC LE GRAPHIQUE PRINCIPAL
     if (typeof mainChart !== 'undefined' && mainChart !== null) {
         mainChart.setActiveElements([
             { datasetIndex: 0, index: currentStreamIndex },
@@ -872,6 +949,7 @@ function updateStreamInspector() {
         mainChart.update();
     }
 }
+
 
 
 
@@ -977,6 +1055,27 @@ document.addEventListener("DOMContentLoaded", () => {
         dateEndInput.valueAsDate = new Date(); 
     }
 });
+
+function toggleStreamDetails() {
+    const row = document.getElementById('streamDetailsRow');
+    const btn = document.getElementById('btnToggleDetails');
+    
+    if (row.style.display === 'none') {
+        row.style.display = 'grid';
+        btn.innerHTML = '▲ MOINS D\'INFOS';
+        // Un gris très légèrement plus clair quand c'est ouvert pour marquer l'action
+        btn.style.background = 'rgba(255,255,255,0.1)';
+        btn.style.color = '#fff';
+    } else {
+        row.style.display = 'none';
+        btn.innerHTML = '▼ PLUS D\'INFOS';
+        // Retour au gris discret par défaut
+        btn.style.background = 'var(--bg-card)';
+        btn.style.color = 'var(--text-dim)';
+    }
+}
+
+
 
 
 </script>
