@@ -283,15 +283,16 @@
                 <div class="chart-wrap"><canvas id="dayChart"></canvas></div>
             </div>
 
-            <div class="card span-2"><div class="chart-header"><div class="chart-title">🧬 MATRICE DE CORRÉLATION</div></div><div id="correlationMatrix"></div></div>
-
-            <div class="card span-2 row-2">
+            <div class="card span-2">
                 <div class="chart-header">
                     <div class="chart-title">📊 CROISSANCE MENSUELLE vs ANNÉE-1</div>
-                    <select id="monthlyMetric" onchange="renderMonthlyTrend()"></select>
                 </div>
                 <div class="chart-wrap"><canvas id="monthlyChart"></canvas></div>
             </div>
+
+            <div class="card span-2 row-2"><div class="chart-header"><div class="chart-title">🧬 MATRICE DE CORRÉLATION</div></div><div id="correlationMatrix"></div></div>
+
+            
 
             <div class="card span-2 row-2 ai-section">
                 <div class="chart-header">
@@ -385,7 +386,8 @@ complete: (res) => {
     });
 
     function initUI() {
-        ['metricA', 'metricB', 'monthlyMetric'].forEach(id => {
+        ['metricA', 'metricB'].forEach(id => {
+
             const el = document.getElementById(id);
             el.innerHTML = id === 'metricB' ? '<option value="none">AUCUNE COMPARAISON</option>' : '';
             Object.keys(METRICS_DICT).forEach(k => el.add(new Option(METRICS_DICT[k].label, k)));
@@ -534,7 +536,7 @@ function renderMonthlyTrend() {
     const ctx = canvas.getContext('2d');
     if(charts.monthly) charts.monthly.destroy();
 
-    const key = document.getElementById('monthlyMetric').value;
+    const key = document.getElementById('metricA').value;
     const groups = {};
 
     // --- LISTE DE FORCE ---
