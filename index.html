@@ -6,6 +6,7 @@
     <title>Plutonh Analytics</title>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -237,11 +238,12 @@
             </div>
             <div style="display:flex; gap:5px; margin-left:10px;">
                 <button class="btn-preset" onclick="setTimeRange(7, this)">7J</button>
-                <button class="btn-preset active" onclick="setTimeRange(30, this)">30J</button>
+                <button class="btn-preset" onclick="setTimeRange(30, this)">30J</button>
                 <button class="btn-preset" onclick="setTimeRange(90, this)">3M</button>
                 <button class="btn-preset" onclick="setTimeRange(180, this)">6M</button>
-                <button class="btn-preset" onclick="setTimeRange(365, this)">1A</button>
+                <button id="btn1A" class="btn-preset active" onclick="setTimeRange(365, this)">1A</button>
                 <button class="btn-preset" onclick="setTimeRange('all', this)">MAX</button>
+
             </div>
             <div style="margin-left:auto; display:flex; gap:10px">
                 <select id="metricA" onchange="refresh()"></select>
@@ -266,9 +268,13 @@
 
 
             <div class="card span-3 row-2">
-                <div class="chart-header"><div class="chart-title">🌀 ANALYSE COMPARATIVE TEMPORELLE</div></div>
-                <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
-            </div>
+    <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="chart-title">🌀 ANALYSE COMPARATIVE TEMPORELLE</div>
+        <button id="btnResetZoom" onclick="resetZoom()" style="display:none; background: rgba(255, 79, 77, 0.15); color: var(--accent-red); border: 1px solid var(--accent-red); padding: 5px 12px; border-radius: 4px; font-size: 0.7rem; font-family: 'Orbitron'; cursor: pointer; font-weight:bold; transition: 0.3s; box-shadow: 0 0 10px rgba(255, 79, 77, 0.2);">✖ ANNULER ZOOM</button>
+    </div>
+    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+</div>
+
 
             <div class="card row-2">
                 <div class="chart-header"><div class="chart-title">💰 REVENUS</div></div>
@@ -387,19 +393,36 @@ complete: (res) => {
 
     function initUI() {
         ['metricA', 'metricB'].forEach(id => {
-
             const el = document.getElementById(id);
             el.innerHTML = id === 'metricB' ? '<option value="none">AUCUNE COMPARAISON</option>' : '';
             Object.keys(METRICS_DICT).forEach(k => el.add(new Option(METRICS_DICT[k].label, k)));
         });
+        
+        // --- ON DÉFINIT LES CHOIX PAR DÉFAUT ICI ---
         document.getElementById('metricA').value = "Spectateurs en moyenne";
-        document.getElementById('metricB').value = "Minutes passées en stream";
+        document.getElementById('metricB').value = "Cumul followers"; // <-- Changé ici !
+        
         document.getElementById('welcomeScreen').style.display = 'none';
         document.getElementById('dashboard').style.display = 'block';
-        setTimeRange(30);
+        
+        // --- ON FORCE 1 AN (365 JOURS) AU LIEU DE 30 ---
+         // --- ON FORCE 1 AN (365 JOURS) AU LIEU DE 30 ---
+        const btn1A = document.getElementById('btn1A'); // On le cible par son ID directement !
+        if(btn1A) {
+            setTimeRange(365, btn1A);
+        } else {
+            setTimeRange(365);
+        }
+
     }
 
+
     function setTimeRange(days, btn) {
+            if (window.myChart) {
+        window.myChart.resetZoom(); // Réinitialise le zoom du graphique
+    }
+    const btnReset = document.getElementById('btnResetZoom');
+    if (btnReset) btnReset.style.display = 'none'; // Cache le bouton
         const end = db[db.length-1]._date;
         const start = days === 'all' ? db[0]._date : new Date(end.getTime() - (days * 24 * 3600 * 1000));
         
@@ -485,49 +508,98 @@ complete: (res) => {
         });
     }
 
-    function renderMainChart(data) {
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        if(charts.main) charts.main.destroy();
-        const mA = document.getElementById('metricA').value;
-        const mB = document.getElementById('metricB').value;
-        const sma = parseInt(document.getElementById('sma').value);
-        const streams = data.filter(d => d["Minutes passées en stream"] > 0);
-        const labels = streams.map(d => d._date.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'}));
-        const applySma = (key) => {
-            const raw = streams.map(d => d[key]||0);
-            if(sma <= 1) return raw;
-            return raw.map((_, i) => { const slice = raw.slice(Math.max(0, i-sma+1), i+1); return slice.reduce((a,b)=>a+b,0) / slice.length; });
-        };
-        const datasets = [{ label: METRICS_DICT[mA].label, data: applySma(mA), borderColor: '#00e5ff', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, tension: 0.4, yAxisID: 'y' }];
-        if(mB !== 'none') datasets.push({ label: METRICS_DICT[mB].label, data: applySma(mB), borderColor: '#9146FF', borderDash: [5,5], tension: 0.4, yAxisID: 'y1' });
-        
-        charts.main = new Chart(ctx, { 
-            type: 'line', 
-            data: { labels, datasets }, 
-            options: { 
-                onHover: (event, activeElements) => {
-                    if (activeElements && activeElements.length > 0) {
-                        const hoveredIndex = activeElements[0].index;
-                        if (typeof currentStreamList !== 'undefined' && currentStreamList && hoveredIndex >= 0 && hoveredIndex < currentStreamList.length) {
-                            if (currentStreamIndex !== hoveredIndex) {
-                                currentStreamIndex = hoveredIndex;
-                                updateStreamInspector();
+    // Variable pour se souvenir des dates avant le zoom
+let preZoomDates = null;
+
+function renderMainChart(data) {
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    if(charts.main) charts.main.destroy();
+    
+    const mA = document.getElementById('metricA').value;
+    const mB = document.getElementById('metricB').value;
+    const sma = parseInt(document.getElementById('sma').value);
+    const streams = data.filter(d => d["Minutes passées en stream"] > 0);
+    const labels = streams.map(d => d._date.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'}));
+    
+    const applySma = (key) => {
+        const raw = streams.map(d => d[key]||0);
+        if(sma <= 1) return raw;
+        return raw.map((_, i) => { const slice = raw.slice(Math.max(0, i-sma+1), i+1); return slice.reduce((a,b)=>a+b,0) / slice.length; });
+    };
+    
+    const datasets = [{ label: METRICS_DICT[mA].label, data: applySma(mA), borderColor: '#00e5ff', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, tension: 0.4, yAxisID: 'y' }];
+    if(mB !== 'none') datasets.push({ label: METRICS_DICT[mB].label, data: applySma(mB), borderColor: '#9146FF', borderDash: [5,5], tension: 0.4, yAxisID: 'y1' });
+    
+    charts.main = new Chart(ctx, { 
+        type: 'line', 
+        data: { labels, datasets }, 
+        options: { 
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { 
+                legend: { display: false },
+                // --- CONFIGURATION DU DRAG & ZOOM ---
+                zoom: {
+                    zoom: {
+                        drag: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 229, 255, 0.2)'
+                        },
+                        mode: 'x',
+                        onZoomComplete: function({chart}) {
+                            // 1. On évite de déborder
+                            const minIndex = Math.max(0, Math.round(chart.scales.x.min));
+                            const maxIndex = Math.min(streams.length - 1, Math.round(chart.scales.x.max));
+                            
+                            // 2. Fonction de formatage
+                            const toYMD = (d) => {
+                                return d.getFullYear() + "-" + 
+                                       String(d.getMonth() + 1).padStart(2, '0') + "-" + 
+                                       String(d.getDate()).padStart(2, '0');
+                            };
+
+                            // 3. Sauvegarde des dates dans window.preZoomDates (sécurisé)
+                            if (!window.preZoomDates) {
+                                window.preZoomDates = {
+                                    start: document.getElementById('dateStart').value,
+                                    end: document.getElementById('dateEnd').value
+                                };
+                            }
+
+                            // 4. Mise à jour des dates
+                            if (typeof streams !== 'undefined' && streams[minIndex] && streams[maxIndex]) {
+                                document.getElementById('dateStart').value = toYMD(streams[minIndex]._date);
+                                document.getElementById('dateEnd').value = toYMD(streams[maxIndex]._date);
+                                
+                                document.getElementById('btnResetZoom').style.display = 'block';
+                                refresh();
                             }
                         }
                     }
-                },
-                responsive: true, 
-                maintainAspectRatio: false, 
-                interaction: { mode: 'index', intersect: false }, 
-                plugins: { legend: { display: true, labels: { color: '#fff', font: { family: 'Orbitron', size: 10 } } } }, 
-                scales: { 
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#00e5ff' } }, 
-                    y1: { display: mB !== 'none', position: 'right', grid: { display: false }, ticks: { color: '#9146FF' } }, 
-                    x: { ticks: { color: '#666' } } 
-                } 
-            } 
-        });
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#00e5ff', font: { size: 10 } } },
+                y1: { display: mB !== 'none', position: 'right', beginAtZero: true, grid: { display: false }, ticks: { color: '#9146FF', font: { size: 10 } } },
+                x: { grid: { display: false }, ticks: { color: '#666', font: { size: 10 } } }
+            }
+        }
+    });
+}
+
+// Fonction pour annuler le zoom
+function resetZoom() {
+    if (window.preZoomDates) {
+        document.getElementById('dateStart').value = window.preZoomDates.start;
+        document.getElementById('dateEnd').value = window.preZoomDates.end;
+        window.preZoomDates = null;
+        document.getElementById('btnResetZoom').style.display = 'none';
+        refresh();
     }
+}
+
+
 
 
 function renderMonthlyTrend() {
@@ -1077,7 +1149,20 @@ function toggleStreamDetails() {
     }
 }
 
-
+['dateStart', 'dateEnd'].forEach(id => {
+    const dateInput = document.getElementById(id);
+    if (dateInput) {
+        dateInput.addEventListener('change', () => {
+            // On reset le zoom
+            if (window.myChart) {
+                window.myChart.resetZoom();
+            }
+            // On cache le bouton
+            const btnReset = document.getElementById('btnResetZoom');
+            if (btnReset) btnReset.style.display = 'none';
+        });
+    }
+});
 
 
 </script>
