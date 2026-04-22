@@ -225,20 +225,37 @@
     
 
 <!-- STREAM DNA -->
-<div class="card" style="grid-column: 1 / -1; margin-top: 15px; border: 1px solid rgba(0, 229, 255, 0.2);">
-    <div class="chart-header">
-        <div class="chart-title" style="color: var(--accent-blue);">🧬 STREAM DNA</div>
-        <div id="dnaCategory" style="font-family:'Orbitron'; font-size: 0.9rem; padding: 6px 14px; border-radius: 6px; background: rgba(0,229,255,0.1); color: var(--accent-blue);">—</div>
+<div class="card" style="grid-column: 1 / -1; margin-top: 15px; border: 1px solid rgba(0, 229, 255, 0.15); background: linear-gradient(135deg, #0a0a0f 0%, #0d0d18 100%);">
+    
+    <!-- Header -->
+    <div class="chart-header" style="margin-bottom: 0;">
+        <div class="chart-title" style="color: var(--accent-blue); display:flex; align-items:center; gap:8px;">
+            🧬 STREAM DNA
+            <span style="font-family:'Inter'; font-size:0.7rem; color:var(--text-dim); font-weight:400; letter-spacing:0;">— empreinte génétique du stream</span>
+        </div>
     </div>
-    <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: center;">
-        <div style="height: 280px; position: relative;">
-            <canvas id="dnaRadar"></canvas>
+
+    <!-- Séparateur -->
+    <div style="height:1px; background: linear-gradient(90deg, rgba(0,229,255,0.2), transparent); margin: 12px 0 16px;"></div>
+
+    <!-- Body : radar + insight -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start;">
+        
+        <!-- Radar -->
+        <div style="position: relative;">
+            <div style="height: 300px; position: relative;">
+                <canvas id="dnaRadar"></canvas>
+            </div>
         </div>
-        <div id="dnaInsight" style="font-size: 0.85rem; line-height: 1.6; color: var(--text-dim); padding: 10px;">
-            <p style="text-align:center; padding-top: 80px;">Sélectionnez un stream pour analyser son ADN.</p>
+
+        <!-- Panneau droit -->
+        <div id="dnaInsight" style="padding: 4px 0;">
+            <p style="text-align:center; padding-top: 80px; color:var(--text-dim);">Sélectionnez un stream pour analyser son ADN.</p>
         </div>
+
     </div>
 </div>
+
 
 
 </div>
@@ -372,6 +389,7 @@ complete: (res) => {
         Object.keys(METRICS_DICT).forEach(k => { if(METRICS_DICT[k].calc) r[k] = METRICS_DICT[k].calc(r); });
         return r;
     }).sort((a,b) => a._date - b._date);
+    window.db = db;
 
     // --- CUMUL FOLLOWERS ---
     let cumul = 0;
@@ -833,7 +851,7 @@ const DNA_CATEGORIES = {
     profitable: { label: "💰 STREAM RENTABLE",     color: "#ffd700", desc: "Excellente monétisation. Ratio revenu/viewer au top. Analyse ce que tu as fait pour reproduire la recette." },
     balanced:   { label: "⚖️ STREAM ÉQUILIBRÉ",   color: "#00e5ff", desc: "Performance solide sur tous les axes. Pas de pic exceptionnel mais une base saine. C'est ton stream 'de fond'." },
     growth:     { label: "📈 STREAM CROISSANCE",   color: "#9146FF", desc: "Fort gain de followers. Tu as converti des visiteurs en abonnés. Ces streams construisent ton futur." },
-    quiet:      { label: "😴 STREAM CREUX",        color: "#666",    desc: "Performance en dessous de ta moyenne. Pas grave, ça arrive. Vérifie le jour/horaire/jeu pour comprendre." }
+    quiet:      { label: "😴 STREAM CREUX",        color: "#888899",    desc: "Performance en dessous de ta moyenne. Pas grave, ça arrive. Vérifie le jour/horaire/jeu pour comprendre." }
 };
 
 // Calcule les percentiles de chaque métrique sur tout l'historique pour normaliser
@@ -897,27 +915,125 @@ function normalize(value, baseline) {
 }
 
 function computeStreamDNA(stream) {
-    const baselines = computeDnaBaselines(stream);
-    if (!baselines) return null;
+    if (!stream) return null;
 
-    const retention     = (stream["Minutes regardées"] || 0) / Math.max(stream["Spectateurs uniques"] || 1, 1);
-    const chatActivity  = (stream["Messages du chat"] || 0) / Math.max(stream["Personnes sur le chat"] || 1, 1);
-    const subConversion = ((stream["Abonnements Prime"]||0) + (stream["Abonnements payés au total"]||0) + (stream["Abonnements offerts au total"]||0)) / Math.max(stream["Spectateurs uniques"]||1, 1) * 1000;
-    const virality      = (stream["Clips créés"] || 0) + (stream["Spectateurs max."] || 0) / Math.max(stream["Spectateurs en moyenne"] || 1, 1);
-    const monetization  = (stream._revTotal || 0) / Math.max((stream["Minutes passées en stream"] || 60) / 60, 0.1);
-    const growth        = stream["Nouveaux followers"] || 0;
-    const reach         = Math.sqrt((stream["Spectateurs uniques"] || 0) * (stream["Spectateurs en moyenne"] || 0));  // 👈 AJOUT
+    // ── Récupère les 6 derniers mois de streams actifs ────────────
+    const now = stream._date || new Date();
+    const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 3600 * 1000);
+
+    const sourceData = window.db || window.allStreamsData || window.streamsData || [];
+    const recentStreams = sourceData.filter(s =>
+        s._date >= sixMonthsAgo &&
+        s._date <= now &&
+        (s["Minutes passées en stream"] || 0) > 30
+    );
+
+    // Percentile rank : où se situe val dans arr (0→100)
+    function pct(val, arr) {
+        if (!arr || arr.length < 2) return 50;
+        const sorted = [...arr].sort((a, b) => a - b);
+        const below = sorted.filter(x => x < val).length;
+        return Math.round((below / (sorted.length - 1)) * 100);
+    }
+
+    // ── Stats du stream courant ───────────────────────────────────
+    const duration      = (parseFloat(stream["Minutes passées en stream"]) || 0) / 60; // heures
+    const avgViewers    = parseFloat(stream["Spectateurs en moyenne"])      || 0;
+    const uniqueViewers = parseFloat(stream["Spectateurs uniques"])         || 0;
+    const chatMessages  = parseFloat(stream["Messages du chat"])            || 0;
+    const chatters = parseFloat(stream["Personnes sur le chat"]) || 0;
+    const followers     = parseFloat(stream["Nouveaux followers"])          || 0;
+    const subs          = (parseFloat(stream["Abonnements payés au total"]) || 0)
+                        + (parseFloat(stream["Abonnements Prime"])          || 0)
+                        + (parseFloat(stream["Abonnements offerts au total"])|| 0);
+    const revenue       = stream._revTotal                                  || 0;
+    const clips         = parseFloat(stream["Visionnements clips"])         || 0;
+    const liveViews     = parseFloat(stream["Vues live"])                   || 0;
+    const engaged       = parseFloat(stream["Viewers impliqués"])           || 0;
+    const raidPct       = parseFloat(stream["Spectateurs d'hébergements et de raids (%)"]) || 0;
+    const minutesWatched = parseFloat(stream["Minutes regardées"])          || (avgViewers * duration * 60);
+
+    // ── Métriques brutes du stream courant ───────────────────────
+    // 1. RÉTENTION : ratio temps regardé / temps disponible
+    const retentionRaw = (uniqueViewers > 0 && duration > 0)
+        ? (minutesWatched / uniqueViewers) / (duration * 60)
+        : 0;
+
+    // 2. CHAT : messages / viewers uniques (total stream)
+    const chatRaw = uniqueViewers > 0 ? chatMessages / uniqueViewers : 0;
+
+
+    // 3. GROWTH : followers + subs pondérés
+    const growthRaw = followers *4 + subs;
+
+    // 4. VIRALITY : clips + engaged + liveViews + raid
+    const viralityRaw = clips + engaged + liveViews * 0.5 + raidPct * 10;
+
+    // 5. REACH : viewers uniques
+    const reachRaw = uniqueViewers;
+
+    // 6. SUB CONVERSION : (tous subs) / viewers uniques
+    const subConvRaw = uniqueViewers > 0 ? subs / uniqueViewers : 0;
+
+    // 7. MONETIZATION : revenu / heure
+    const monoRaw = duration > 0 ? revenue / duration : 0;
+
+    // ── Tableaux de référence (6 derniers mois) ──────────────────
+    const ref = {
+        retention: recentStreams.map(s => {
+            const dur  = (parseFloat(s["Minutes passées en stream"]) || 0) / 60;
+            const uniq = parseFloat(s["Spectateurs uniques"]) || 0;
+            const avg  = parseFloat(s["Spectateurs en moyenne"]) || 0;
+            const mw   = parseFloat(s["Minutes regardées"]) || (avg * dur * 60);
+            return (uniq > 0 && dur > 0) ? (mw / uniq) / (dur * 60) : 0;
+        }),
+        chat: recentStreams.map(s => {
+            const uniq = parseFloat(s["Spectateurs uniques"]) || 0;
+            const msgs = parseFloat(s["Messages du chat"]) || 0;
+            return uniq > 0 ? msgs / uniq : 0;
+        }),
+        growth: recentStreams.map(s =>
+            (parseFloat(s["Nouveaux followers"]) || 0) +
+            ((parseFloat(s["Abonnements payés au total"]) || 0) +
+             (parseFloat(s["Abonnements Prime"]) || 0) +
+             (parseFloat(s["Abonnements offerts au total"]) || 0)) * 5
+        ),
+        virality: recentStreams.map(s =>
+            (parseFloat(s["Visionnements clips"]) || 0) +
+            (parseFloat(s["Viewers impliqués"]) || 0) +
+            (parseFloat(s["Vues live"]) || 0) * 0.5 +
+            (parseFloat(s["Spectateurs d'hébergements et de raids (%)"]) || 0) * 10
+        ),
+        reach: recentStreams.map(s => parseFloat(s["Spectateurs uniques"]) || 0),
+        subConv: recentStreams.map(s => {
+            const uniq = parseFloat(s["Spectateurs uniques"]) || 0;
+            const sb   = (parseFloat(s["Abonnements payés au total"]) || 0)
+                       + (parseFloat(s["Abonnements Prime"]) || 0)
+                       + (parseFloat(s["Abonnements offerts au total"]) || 0);
+            return uniq > 0 ? sb / uniq : 0;
+        }),
+        mono: recentStreams.map(s => {
+            const dur = (parseFloat(s["Minutes passées en stream"]) || 0) / 60;
+            return dur > 0 ? (s._revTotal || 0) / dur : 0;
+        }),
+    };
+
+    console.log("recentStreams count:", recentStreams.length);
+console.log("rawValues:", { retentionRaw, chatRaw, growthRaw, reachRaw });
+console.log("ref samples:", { retention: ref.retention.slice(0,3), reach: ref.reach.slice(0,3) });
 
     return {
-        retention:     normalize(retention,     baselines.retention),
-        chatActivity:  normalize(chatActivity,  baselines.chatActivity),
-        subConversion: normalize(subConversion, baselines.subConversion),
-        virality:      normalize(virality,      baselines.virality),
-        monetization:  normalize(monetization,  baselines.monetization),
-        growth:        normalize(growth,        baselines.growth),
-        reach:         normalize(reach,         baselines.reach)    // 👈 AJOUT
+        retention:     Math.max(0, Math.min(pct(retentionRaw,  ref.retention),  100)),
+        chatActivity:  Math.max(0, Math.min(pct(chatRaw,       ref.chat),        100)),
+        subConversion: Math.max(0, Math.min(pct(subConvRaw,    ref.subConv),     100)),
+        virality:      Math.max(0, Math.min(pct(viralityRaw,   ref.virality),    100)),
+        monetization:  Math.max(0, Math.min(pct(monoRaw,       ref.mono),        100)),
+        growth:        Math.max(0, Math.min(pct(growthRaw,     ref.growth),      100)),
+        reach:         Math.max(0, Math.min(pct(reachRaw,      ref.reach),       100)),
     };
 }
+
+
 
 
 // Classification du type de stream selon le profil DNA
@@ -952,69 +1068,255 @@ function renderStreamDNA(stream) {
     const category = classifyStream(dna);
     const cat = DNA_CATEGORIES[category];
 
-    // Met à jour le badge de catégorie
-    const badge = document.getElementById('dnaCategory');
-    badge.innerText = cat.label;
-    badge.style.color = cat.color;
-    badge.style.background = cat.color + '20';
-    badge.style.border = `1px solid ${cat.color}40`;
+    const axes = [
+        { key: 'retention',    label: 'Rétention',   icon: '⏱',  desc: 'Durée moyenne passée par viewer. Mesure si ton contenu accroche dans la durée.',         color: '#00e5ff' },
+        { key: 'chatActivity', label: 'Chat',         icon: '💬',  desc: 'Ratio messages / viewers. Indique à quel point ton audience est impliquée en live.',     color: '#9146FF' },
+        { key: 'subConversion',label: 'Conv. Sub',    icon: '⭐',  desc: 'Taux de conversion viewer → sub. Reflète la fidélisation et la valeur perçue.',         color: '#ffd700' },
+        { key: 'virality',     label: 'Viralité',     icon: '🚀',  desc: 'Clips, raids, nouveaux viewers. Estime le potentiel de propagation du stream.',         color: '#ff4f4d' },
+        { key: 'monetization', label: 'Monétisation', icon: '💰',  desc: 'Revenus rapportés au nombre de viewers. Ton efficacité économique par stream.',         color: '#00ffa3' },
+        { key: 'growth',       label: 'Croissance',   icon: '📈',  desc: 'Nouveaux followers gagnés. Mesure ton attractivité auprès de nouveaux viewers.',        color: '#a78bfa' },
+        { key: 'reach',        label: 'Portée',       icon: '📡',  desc: 'Viewers uniques et vues live. Évalue la largeur de ton audience ce stream.',            color: '#38bdf8' }
+    ];
 
-    // Met à jour l'insight texte
-    const insight = document.getElementById('dnaInsight');
-    const topTrait = Object.entries(dna).sort((a,b) => b[1] - a[1])[0];
-    const weakTrait = Object.entries(dna).sort((a,b) => a[1] - b[1])[0];
-    const traitLabels = {
-        retention: "Rétention", chatActivity: "Activité Chat", subConversion: "Conversion Sub",
-        virality: "Viralité", monetization: "Monétisation", growth: "Croissance",
-        reach: "Portée"   // 👈 AJOUT
+    const vals = axes.map(a => dna[a.key] ?? 0);
+
+    // ── Légende interactive ───────────────────────────────────────
+    const legendEl = document.getElementById('dnaLegend');
+    if (legendEl) {
+        legendEl.innerHTML = axes.map((a, i) => `
+            <div class="dna-legend-pill" data-idx="${i}"
+                 title="${a.desc}"
+                 style="
+                    display:flex; align-items:center; gap:5px;
+                    padding: 3px 10px; border-radius: 20px; cursor:pointer;
+                    background: ${a.color}12; border: 1px solid ${a.color}30;
+                    font-size: 0.72rem; color: ${a.color};
+                    font-family: 'Inter'; transition: all 0.2s;
+                 "
+                 onmouseover="this.style.background='${a.color}28'; this.style.borderColor='${a.color}80'; showDnaTooltip(event, ${i})"
+                 onmouseleave="this.style.background='${a.color}12'; this.style.borderColor='${a.color}30'; hideDnaTooltip()"
+            >
+                <span>${a.icon}</span>
+                <span>${a.label}</span>
+                <span style="font-weight:700; color:#fff;">${vals[i].toFixed(0)}</span>
+            </div>
+        `).join('');
+    }
+
+    // ── Tooltip DNA ───────────────────────────────────────────────
+    if (!document.getElementById('dnaTooltip')) {
+        const tt = document.createElement('div');
+        tt.id = 'dnaTooltip';
+        tt.style.cssText = `
+            position:fixed; z-index:9999; pointer-events:none;
+            background:#13131f; border:1px solid rgba(255,255,255,0.12);
+            border-radius:8px; padding:10px 14px; max-width:220px;
+            font-size:0.78rem; line-height:1.5; color:#f5f5f7;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            opacity:0; transition: opacity 0.15s;
+        `;
+        document.body.appendChild(tt);
+    }
+
+    window.showDnaTooltip = function(e, idx) {
+        const tt = document.getElementById('dnaTooltip');
+        const a = axes[idx];
+        tt.innerHTML = `
+            <div style="font-weight:700; color:${a.color}; margin-bottom:4px;">${a.icon} ${a.label} — ${vals[idx].toFixed(0)}/100</div>
+            <div style="color:#9aa0a6;">${a.desc}</div>
+        `;
+        tt.style.opacity = '1';
+        tt.style.left = (e.clientX + 14) + 'px';
+        tt.style.top  = (e.clientY - 10) + 'px';
+    };
+    window.hideDnaTooltip = function() {
+        const tt = document.getElementById('dnaTooltip');
+        if (tt) tt.style.opacity = '0';
     };
 
-    insight.innerHTML = `
-        <p style="color: ${cat.color}; font-weight: 600; margin-bottom: 10px;">${cat.desc}</p>
-        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,255,163,0.08); border-radius: 6px; margin-bottom: 6px;">
-            <span>💪 Point fort</span>
-            <strong style="color: var(--accent-green)">${traitLabels[topTrait[0]]} (${topTrait[1].toFixed(0)}/100)</strong>
+    // ── Score global PONDÉRÉ ──────────────────────────────────────
+    const weights = {
+    retention:     0.22,  // cœur de la qualité
+    chatActivity:  0.15,  // engagement réel
+    growth:        0.18,  // construction long terme
+    reach:         0.20,  // audience brute, utile mais secondaire
+    virality:      0.12,  // potentiel de diffusion
+    subConversion: 0.08,  // monétisation fidèles
+    monetization:  0.05,  // dépend du statut partenaire
+    };
+    const globalScore = Math.round(
+        dna.retention     * weights.retention     +
+        dna.chatActivity  * weights.chatActivity  +
+        dna.growth        * weights.growth        +
+        dna.virality      * weights.virality      +
+        dna.reach         * weights.reach         +
+        dna.subConversion * weights.subConversion +
+        dna.monetization  * weights.monetization
+    );
+    const scoreColor = globalScore >= 70 ? '#00ffa3' : globalScore >= 45 ? '#00e5ff' : '#ff4f4d';
+
+    // ── Texte dynamique basé sur les vraies stats ─────────────────
+    const lines = [];
+    if (dna.retention >= 70)
+        lines.push('Ton audience reste longtemps — excellent signe d\'accroche.');
+    else if (dna.retention < 40)
+        lines.push('La rétention est faible : les viewers partent tôt, travaille l\'intro.');
+
+    if (dna.chatActivity >= 70)
+        lines.push('Le chat est très actif, ton audience est engagée.');
+    else if (dna.chatActivity < 35)
+        lines.push('Peu d\'interactions chat — relance ton audience avec des questions.');
+
+    if (dna.virality >= 65)
+        lines.push('Bonne viralité : clips, raids et nouveaux viewers au rendez-vous.');
+    else if (dna.virality < 35)
+        lines.push('Peu de viralité : encourage les clips et les raids entrants.');
+
+    if (dna.growth >= 65)
+        lines.push('Fort gain de followers ce stream.');
+    else if (dna.growth < 30)
+        lines.push('Croissance faible : pense à des call-to-action follow.');
+
+    if (dna.subConversion >= 60)
+        lines.push('Excellente conversion en subs.');
+    else if (dna.subConversion < 25)
+        lines.push('La conversion sub est à travailler : propose des objectifs sub.');
+
+    // Max 2 phrases, fallback sur la desc de catégorie
+    const dynamicDesc = lines.slice(0, 2).join(' ') || cat.desc;
+
+    // ── Insight panel ─────────────────────────────────────────────
+    const sorted = [...axes.map((a, i) => ({...a, val: vals[i]}))].sort((a, b) => b.val - a.val);
+    const top3   = sorted.slice(0, 3);
+    const bottom = sorted[sorted.length - 1];
+
+    document.getElementById('dnaInsight').innerHTML = `
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:18px;">
+            <div style="
+                width:64px; height:64px; border-radius:50%;
+                border: 2px solid ${scoreColor}60;
+                background: ${scoreColor}10;
+                display:flex; flex-direction:column; align-items:center; justify-content:center;
+                flex-shrink:0;
+            ">
+                <span style="font-size:1.3rem; font-weight:800; color:${scoreColor}; font-family:'Orbitron';">${globalScore}</span>
+                <span style="font-size:0.55rem; color:var(--text-dim); letter-spacing:1px;">SCORE</span>
+            </div>
+            <div>
+                <div style="font-size:1rem; font-weight:700; color:${cat.color}; margin-bottom:4px;">${cat.label}</div>
+                <div style="font-size:0.8rem; color:var(--text-dim); line-height:1.5;">${dynamicDesc}</div>
+            </div>
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(255,79,77,0.08); border-radius: 6px;">
-            <span>🎯 À améliorer</span>
-            <strong style="color: var(--accent-red)">${traitLabels[weakTrait[0]]} (${weakTrait[1].toFixed(0)}/100)</strong>
+
+        <div style="height:1px; background:rgba(255,255,255,0.06); margin-bottom:14px;"></div>
+
+        <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-dim); margin-bottom:8px;">Points forts</div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+            ${top3.map((a, rank) => {
+                const barW = a.val.toFixed(0);
+                const opacity = rank === 0 ? '1' : rank === 1 ? '0.75' : '0.55';
+                return `
+                <div style="display:flex; align-items:center; gap:10px; opacity:${opacity};">
+                    <span style="font-size:0.78rem; width:14px; color:var(--text-dim);">${rank+1}</span>
+                    <span style="font-size:0.78rem; width:18px;">${a.icon}</span>
+                    <span style="font-size:0.78rem; color:#f5f5f7; width:80px;">${a.label}</span>
+                    <div style="flex:1; height:4px; background:rgba(255,255,255,0.07); border-radius:2px; overflow:hidden;">
+                        <div style="width:${barW}%; height:100%; background:${a.color}; border-radius:2px; box-shadow: 0 0 6px ${a.color}80;"></div>
+                    </div>
+                    <span style="font-size:0.78rem; font-weight:700; color:${a.color}; width:28px; text-align:right;">${barW}</span>
+                </div>`;
+            }).join('')}
+        </div>
+
+        <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--text-dim); margin-bottom:8px;">À améliorer</div>
+        <div style="
+            display:flex; align-items:center; gap:10px;
+            padding: 8px 12px; border-radius:8px;
+            background: ${bottom.color}0d; border: 1px solid ${bottom.color}25;
+        ">
+            <span>${bottom.icon}</span>
+            <div style="flex:1;">
+                <div style="font-size:0.8rem; color:#f5f5f7; font-weight:600;">${bottom.label}</div>
+                <div style="font-size:0.72rem; color:var(--text-dim); margin-top:2px;">${bottom.desc}</div>
+            </div>
+            <span style="font-size:0.85rem; font-weight:800; color:${bottom.color}; font-family:'Orbitron';">${bottom.val.toFixed(0)}</span>
         </div>
     `;
 
-    // Détruit l'ancien radar
+    // ── Radar Chart ───────────────────────────────────────────────
     if (charts.dna) charts.dna.destroy();
 
-    charts.dna = new Chart(canvas.getContext('2d'), {
+    const ctx = canvas.getContext('2d');
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const glowFill = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(cx, cy));
+    glowFill.addColorStop(0, cat.color + '55');
+    glowFill.addColorStop(1, cat.color + '08');
+
+    charts.dna = new Chart(ctx, {
         type: 'radar',
         data: {
-            labels: ['Rétention', 'Chat', 'Conversion Sub', 'Viralité', 'Monétisation', 'Croissance', '📡 Portée'], // 👈 AJOUT
+            labels: axes.map(a => `${a.icon} ${a.label}`),
             datasets: [{
-                label: 'Stream DNA',
-                data: [dna.retention, dna.chatActivity, dna.subConversion, dna.virality, dna.monetization, dna.growth, dna.reach], // 👈 AJOUT
-                backgroundColor: cat.color + '30',
+                data: vals,
                 borderColor: cat.color,
-                borderWidth: 2,
+                backgroundColor: glowFill,
                 pointBackgroundColor: cat.color,
-                pointBorderColor: '#fff',
-                pointRadius: 4
+                pointBorderColor: '#0d0d1a',
+                pointBorderWidth: 2,
+                pointHoverBackgroundColor: '#ffffff',
+                pointHoverBorderColor: cat.color,
+                pointRadius: 5,
+                pointHoverRadius: 8,
+                borderWidth: 2.5,
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            animation: { duration: 700, easing: 'easeInOutQuart' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: '#13131f',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    titleColor: '#f5f5f7',
+                    bodyColor: '#9aa0a6',
+                    callbacks: {
+                        title: (items) => {
+                            const idx = items[0].dataIndex;
+                            return `${axes[idx].icon} ${axes[idx].label}`;
+                        },
+                        label: (item) => {
+                            const idx = item.dataIndex;
+                            return [`Score : ${item.raw.toFixed(0)}/100`, axes[idx].desc];
+                        }
+                    }
+                }
+            },
             scales: {
                 r: {
-                    beginAtZero: true, max: 100,
-                    grid:       { color: 'rgba(145, 70, 255, 0.15)' },
-                    angleLines: { color: 'rgba(145, 70, 255, 0.15)' },
-                    pointLabels:{ color: '#f5f5f7', font: { size: 11, family: 'Orbitron' } },
-                    ticks:      { display: false, stepSize: 25 }
+                    beginAtZero: true,
+                    max: 100,
+                    grid: { color: 'rgba(255,255,255,0.05)', lineWidth: 1 },
+                    angleLines: { color: 'rgba(255,255,255,0.07)', lineWidth: 1 },
+                    pointLabels: {
+                        color: '#9aa0a6',
+                        font: { size: 11, family: 'Inter', weight: '500' },
+                        padding: 8
+                    },
+                    ticks: { display: false, stepSize: 25 }
                 }
             }
         }
     });
 }
+
+
+
 
 
 
@@ -1159,15 +1461,19 @@ function updateStreamInspector() {
 
     // 6. SYNCHRONISATION AVEC LE GRAPHIQUE PRINCIPAL
     if (typeof mainChart !== 'undefined' && mainChart !== null) {
-        mainChart.setActiveElements([
-            { datasetIndex: 0, index: currentStreamIndex },
-            { datasetIndex: 1, index: currentStreamIndex }
-        ]);
-        mainChart.tooltip.setActiveElements([
-            { datasetIndex: 0, index: currentStreamIndex }
-        ], { x: 0, y: 0 });
-        mainChart.update();
+        try {
+            mainChart.setActiveElements([
+                { datasetIndex: 0, index: currentStreamIndex },
+                { datasetIndex: 1, index: currentStreamIndex }
+            ]);
+            mainChart.tooltip.setActiveElements([
+                { datasetIndex: 0, index: currentStreamIndex }
+            ], { x: 0, y: 0 });
+            mainChart.update();
+        } catch(e) {}
     }
+
+
 
         // 🧬 Render Stream DNA pour le stream courant
     renderStreamDNA(s);
