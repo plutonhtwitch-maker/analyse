@@ -170,6 +170,8 @@
         </div>
     </div>
 
+
+
     <!-- LIGNE 2 : MODE AVANCÉ (Cachée par défaut) -->
     <div id="streamDetailsRow" style="display: none; grid-template-columns: repeat(8, 1fr); gap: 10px; margin-bottom: 20px;">
         
@@ -220,11 +222,26 @@
             <div><span id="ss-raid" style="font-size: 1.1rem; font-weight: bold; color: var(--text-main); font-family: 'Orbitron';">0%</span></div>
             <span id="ss-raid-diff" style="position: absolute; bottom: 10px; right: 10px; font-size: 0.65rem;"></span>
         </div>
+    
+
+<!-- STREAM DNA -->
+<div class="card" style="grid-column: 1 / -1; margin-top: 15px; border: 1px solid rgba(0, 229, 255, 0.2);">
+    <div class="chart-header">
+        <div class="chart-title" style="color: var(--accent-blue);">🧬 STREAM DNA</div>
+        <div id="dnaCategory" style="font-family:'Orbitron'; font-size: 0.9rem; padding: 6px 14px; border-radius: 6px; background: rgba(0,229,255,0.1); color: var(--accent-blue);">—</div>
     </div>
+    <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: center;">
+        <div style="height: 280px; position: relative;">
+            <canvas id="dnaRadar"></canvas>
+        </div>
+        <div id="dnaInsight" style="font-size: 0.85rem; line-height: 1.6; color: var(--text-dim); padding: 10px;">
+            <p style="text-align:center; padding-top: 80px;">Sélectionnez un stream pour analyser son ADN.</p>
+        </div>
+    </div>
+</div>
 
 
-
-
+</div>
 
         <div class="controls-bar" style="margin-top: 25px;">
 
@@ -253,7 +270,7 @@
                     <option value="30">SMA 30J</option>
                 </select>
             </div>
-        </div> <!-- C'EST CETTE BALISE QUI AVAIT DISPARU ! -->
+        </div>
 
         <!-- Notre zone de texte descriptive -->
         <div id="metricDesc" style="text-align: right; color: var(--text-dim); font-size: 0.75rem; margin-top: 10px; margin-bottom: 15px; padding-right: 5px; font-style: italic;"></div>
@@ -805,6 +822,204 @@ function renderDayChart(data) {
         }
     });
 }
+
+// ============================================
+// 🧬 STREAM DNA - Empreinte génétique de stream
+// ============================================
+
+const DNA_CATEGORIES = {
+    community:  { label: "🎯 STREAM COMMUNAUTÉ",  color: "#00ffa3", desc: "Audience modeste mais ultra-engagée. Le chat est vivant, la communauté répond présent. Capitalise sur ces moments pour fidéliser." },
+    viral:      { label: "🚀 STREAM VIRAL",        color: "#ff4f4d", desc: "Gros pic de viewers, clips créés. Tu as attiré du monde neuf. Attention : la rétention est souvent faible, pense à retenir les nouveaux." },
+    profitable: { label: "💰 STREAM RENTABLE",     color: "#ffd700", desc: "Excellente monétisation. Ratio revenu/viewer au top. Analyse ce que tu as fait pour reproduire la recette." },
+    balanced:   { label: "⚖️ STREAM ÉQUILIBRÉ",   color: "#00e5ff", desc: "Performance solide sur tous les axes. Pas de pic exceptionnel mais une base saine. C'est ton stream 'de fond'." },
+    growth:     { label: "📈 STREAM CROISSANCE",   color: "#9146FF", desc: "Fort gain de followers. Tu as converti des visiteurs en abonnés. Ces streams construisent ton futur." },
+    quiet:      { label: "😴 STREAM CREUX",        color: "#666",    desc: "Performance en dessous de ta moyenne. Pas grave, ça arrive. Vérifie le jour/horaire/jeu pour comprendre." }
+};
+
+// Calcule les percentiles de chaque métrique sur tout l'historique pour normaliser
+function computeDnaBaselines(referenceStream) {
+    // Fenêtre : 6 mois avant le stream de référence
+    const refDate = referenceStream._date;
+    const sixMonthsAgo = new Date(refDate.getTime() - (180 * 24 * 3600 * 1000));
+    
+    // On prend les streams des 6 derniers mois AVANT ce stream (exclu)
+    let window = db.filter(d => 
+        d._date >= sixMonthsAgo && 
+        d._date < refDate &&
+        (d["Minutes passées en stream"] || 0) > 0
+    );
+    
+    // Fallback : si moins de 10 streams dans la fenêtre (début de chaîne),
+    // on élargit aux 10 streams précédents pour éviter les scores absurdes
+    if (window.length < 10) {
+        window = db.filter(d => 
+            d._date < refDate && 
+            (d["Minutes passées en stream"] || 0) > 0
+        ).slice(-10);
+    }
+    
+    if (window.length === 0) return null;
+
+    // Calcul des métriques brutes sur la fenêtre
+    const retention     = window.map(d => (d["Minutes regardées"]||0) / Math.max(d["Spectateurs uniques"]||1, 1));
+    const chatActivity  = window.map(d => (d["Messages du chat"]||0) / Math.max(d["Personnes sur le chat"]||1, 1));
+    const subConversion = window.map(d => ((d["Abonnements Prime"]||0) + (d["Abonnements payés au total"]||0) + (d["Abonnements offerts au total"]||0)) / Math.max(d["Spectateurs uniques"]||1, 1) * 1000);
+    const virality      = window.map(d => (d["Clips créés"]||0) + (d["Spectateurs max."]||0) / Math.max(d["Spectateurs en moyenne"]||1, 1));
+    const monetization  = window.map(d => (d._revTotal||0) / Math.max((d["Minutes passées en stream"]||60) / 60, 0.1));
+    const growth        = window.map(d => d["Nouveaux followers"]||0);
+    const reach = window.map(d => 
+    Math.sqrt(        (d["Spectateurs uniques"]||0) *         (d["Spectateurs en moyenne"]||0)    )
+);
+
+    // Helper p95
+    const p95 = arr => {
+        const sorted = [...arr].sort((a,b) => a-b);
+        return sorted[Math.floor(sorted.length * 0.95)] || 0;
+    };
+
+    return {
+        retention:     { p95: p95(retention) },
+        chatActivity:  { p95: p95(chatActivity) },
+        subConversion: { p95: p95(subConversion) },
+        virality:      { p95: p95(virality) },
+        monetization:  { p95: p95(monetization) },
+        growth:        { p95: p95(growth) },
+        reach:         { p95: p95(reach) },   // 👈 AJOUT
+        _windowSize:   window.length
+    };
+}
+
+
+// Score 0-100 basé sur le p95 (évite que 1 stream exceptionnel écrase l'échelle)
+function normalize(value, baseline) {
+    if (!baseline || baseline.p95 === 0) return 0;
+    return Math.min(100, Math.max(0, (value / baseline.p95) * 100));
+}
+
+function computeStreamDNA(stream) {
+    const baselines = computeDnaBaselines(stream);
+    if (!baselines) return null;
+
+    const retention     = (stream["Minutes regardées"] || 0) / Math.max(stream["Spectateurs uniques"] || 1, 1);
+    const chatActivity  = (stream["Messages du chat"] || 0) / Math.max(stream["Personnes sur le chat"] || 1, 1);
+    const subConversion = ((stream["Abonnements Prime"]||0) + (stream["Abonnements payés au total"]||0) + (stream["Abonnements offerts au total"]||0)) / Math.max(stream["Spectateurs uniques"]||1, 1) * 1000;
+    const virality      = (stream["Clips créés"] || 0) + (stream["Spectateurs max."] || 0) / Math.max(stream["Spectateurs en moyenne"] || 1, 1);
+    const monetization  = (stream._revTotal || 0) / Math.max((stream["Minutes passées en stream"] || 60) / 60, 0.1);
+    const growth        = stream["Nouveaux followers"] || 0;
+    const reach         = Math.sqrt((stream["Spectateurs uniques"] || 0) * (stream["Spectateurs en moyenne"] || 0));  // 👈 AJOUT
+
+    return {
+        retention:     normalize(retention,     baselines.retention),
+        chatActivity:  normalize(chatActivity,  baselines.chatActivity),
+        subConversion: normalize(subConversion, baselines.subConversion),
+        virality:      normalize(virality,      baselines.virality),
+        monetization:  normalize(monetization,  baselines.monetization),
+        growth:        normalize(growth,        baselines.growth),
+        reach:         normalize(reach,         baselines.reach)    // 👈 AJOUT
+    };
+}
+
+
+// Classification du type de stream selon le profil DNA
+function classifyStream(dna) {
+    const avg = (dna.retention + dna.chatActivity + dna.subConversion + dna.virality + dna.monetization + dna.growth) / 6;
+    
+    // Si tout est en dessous de la médiane
+    if (avg < 30) return 'quiet';
+    
+    // On cherche le trait dominant (écart à la moyenne)
+    const traits = [
+        { key: 'viral',      score: (dna.virality + dna.growth) / 2 - avg },
+        { key: 'profitable', score: (dna.monetization + dna.subConversion) / 2 - avg },
+        { key: 'community',  score: (dna.chatActivity + dna.retention) / 2 - avg },
+        { key: 'growth',     score: dna.growth - avg }
+    ];
+    
+    traits.sort((a, b) => b.score - a.score);
+    
+    // Si aucun trait ne dépasse vraiment, c'est équilibré
+    if (traits[0].score < 10) return 'balanced';
+    return traits[0].key;
+}
+
+function renderStreamDNA(stream) {
+    const canvas = document.getElementById('dnaRadar');
+    if (!canvas || !stream) return;
+
+    const dna = computeStreamDNA(stream);
+    if (!dna) return;
+
+    const category = classifyStream(dna);
+    const cat = DNA_CATEGORIES[category];
+
+    // Met à jour le badge de catégorie
+    const badge = document.getElementById('dnaCategory');
+    badge.innerText = cat.label;
+    badge.style.color = cat.color;
+    badge.style.background = cat.color + '20';
+    badge.style.border = `1px solid ${cat.color}40`;
+
+    // Met à jour l'insight texte
+    const insight = document.getElementById('dnaInsight');
+    const topTrait = Object.entries(dna).sort((a,b) => b[1] - a[1])[0];
+    const weakTrait = Object.entries(dna).sort((a,b) => a[1] - b[1])[0];
+    const traitLabels = {
+        retention: "Rétention", chatActivity: "Activité Chat", subConversion: "Conversion Sub",
+        virality: "Viralité", monetization: "Monétisation", growth: "Croissance",
+        reach: "Portée"   // 👈 AJOUT
+    };
+
+    insight.innerHTML = `
+        <p style="color: ${cat.color}; font-weight: 600; margin-bottom: 10px;">${cat.desc}</p>
+        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,255,163,0.08); border-radius: 6px; margin-bottom: 6px;">
+            <span>💪 Point fort</span>
+            <strong style="color: var(--accent-green)">${traitLabels[topTrait[0]]} (${topTrait[1].toFixed(0)}/100)</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(255,79,77,0.08); border-radius: 6px;">
+            <span>🎯 À améliorer</span>
+            <strong style="color: var(--accent-red)">${traitLabels[weakTrait[0]]} (${weakTrait[1].toFixed(0)}/100)</strong>
+        </div>
+    `;
+
+    // Détruit l'ancien radar
+    if (charts.dna) charts.dna.destroy();
+
+    charts.dna = new Chart(canvas.getContext('2d'), {
+        type: 'radar',
+        data: {
+            labels: ['Rétention', 'Chat', 'Conversion Sub', 'Viralité', 'Monétisation', 'Croissance', '📡 Portée'], // 👈 AJOUT
+            datasets: [{
+                label: 'Stream DNA',
+                data: [dna.retention, dna.chatActivity, dna.subConversion, dna.virality, dna.monetization, dna.growth, dna.reach], // 👈 AJOUT
+                backgroundColor: cat.color + '30',
+                borderColor: cat.color,
+                borderWidth: 2,
+                pointBackgroundColor: cat.color,
+                pointBorderColor: '#fff',
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                r: {
+                    beginAtZero: true, max: 100,
+                    grid:       { color: 'rgba(145, 70, 255, 0.15)' },
+                    angleLines: { color: 'rgba(145, 70, 255, 0.15)' },
+                    pointLabels:{ color: '#f5f5f7', font: { size: 11, family: 'Orbitron' } },
+                    ticks:      { display: false, stepSize: 25 }
+                }
+            }
+        }
+    });
+}
+
+
+
+
+
 function updateStreamInspector() {
     const keysToReset = ['time', 'viewers', 'follows', 'subs', 'rev', 'chatters', 'msgs', 'retention', 'liveviews', 'uniques', 'engaged', 'clips', 'adrev', 'bitsrev', 'gifts', 'raid'];
 
@@ -933,6 +1148,9 @@ function updateStreamInspector() {
         });
     }
 
+        // 🧬 Render Stream DNA
+    renderStreamDNA(s);
+
     // 5. GESTION DE L'AFFICHAGE DES BOUTONS PRÉCÉDENT/SUIVANT
     document.getElementById('btnPrevStream').style.opacity = currentStreamIndex === 0 ? "0.3" : "1";
     document.getElementById('btnPrevStream').style.cursor = currentStreamIndex === 0 ? "default" : "pointer";
@@ -950,6 +1168,9 @@ function updateStreamInspector() {
         ], { x: 0, y: 0 });
         mainChart.update();
     }
+
+        // 🧬 Render Stream DNA pour le stream courant
+    renderStreamDNA(s);
 }
 
 
