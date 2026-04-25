@@ -97,9 +97,21 @@
 
     <div id="dashboard" style="display:none;">
         <div class="header">
-            <div class="logo">NEBULA <span>V7.1</span></div>
-            <div id="activeDateRange" style="font-size: 0.8rem; font-family:'Orbitron'; color: var(--twitch-purple);">ANALYSIS ACTIVE</div>
-        </div>
+    <div class="logo">NEBULA <span>V7.1</span></div>
+    
+    <div id="activeDateRange" style="font-size: 0.8rem; font-family:'Orbitron'; color: var(--twitch-purple);">ANALYSIS ACTIVE</div>
+    
+    <!-- LES BOUTONS DE MISE À JOUR DANS LE DASHBOARD -->
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <button onclick="document.getElementById('csvInput').click()" style="background: var(--bg-card); color: white; border: 1px solid var(--twitch-purple); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron'; font-size: 0.75rem; transition: 0.3s;">
+            📂 METTRE À JOUR
+        </button>
+        <button onclick="clearCache()" style="background: transparent; color: var(--accent-red); border: 1px solid var(--accent-red); padding: 8px 15px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron'; font-size: 0.75rem; transition: 0.3s;">
+            🗑️ VIDER
+        </button>
+    </div>
+</div>
+
 
   <!-- NOUVEAU BLOC : INSPECTEUR DE STREAM -->
 <div class="stream-inspector" style="grid-column: 1 / -1; background: linear-gradient(180deg, #0a0a0f 0%, #12121a 100%); border-top: 2px solid var(--accent-blue); padding: 20px; border-radius: 12px; margin-top: 15px;">
@@ -371,24 +383,22 @@
     };
 
 
-    document.getElementById('csvInput').addEventListener('change', (e) => {
-        if(!e.target.files.length) return;
-        Papa.parse(e.target.files[0], {
-            header: true, dynamicTyping: true, skipEmptyLines: true,
-complete: (res) => {
-    db = res.data.map(r => {
+// ─── 1. LA FONCTION DE CALCUL (à partir du cache ou du fichier) ───
+function processAndRenderData(rawData) {
+    db = rawData.map(r => {
+        // On s'assure que r.Date devient un objet Date exploitable
         r._date = new Date(r.Date);
         r._revTotal = (r["Revenu issu des abonnements"]||0) + (r["Revenu Prime"]||0) + (r["Revenus issus des abonnements offerts"]||0) + (r["Revenu des Bits"]||0) + (r["Revenu issu de la publicité"]||0) + (r["Revenus Turbo"]||0);
         
         // Calcul des subs du jour
         r._dailySubs = (r["Abonnements Prime"] || 0) + (r["Abonnements payés au total"] || 0) + (r["Abonnements offerts au total"] || 0);
         
-        // --- NOUVELLE LIGNE : On rend les nouveaux subs disponibles pour les graphiques ---
         r["Nouveaux subs"] = r._dailySubs;
 
         Object.keys(METRICS_DICT).forEach(k => { if(METRICS_DICT[k].calc) r[k] = METRICS_DICT[k].calc(r); });
         return r;
     }).sort((a,b) => a._date - b._date);
+    
     window.db = db;
 
     // --- CUMUL FOLLOWERS ---
@@ -412,13 +422,70 @@ complete: (res) => {
         r["Subs actifs"] = subsActifs;
     });
 
+    // On s'assure de bien masquer l'accueil et afficher le dashboard
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+
+    // On lance le reste de ton interface (graphiques, etc.)
     initUI();
 }
 
+// ─── 2. GESTION DU BOUTON D'IMPORTATION (MERGE CSV) ───
+document.getElementById('csvInput').addEventListener('change', (e) => {
+    if(!e.target.files.length) return;
+    
+    Papa.parse(e.target.files[0], {
+        header: true, dynamicTyping: true, skipEmptyLines: true,
+        complete: (res) => {
+            const newData = res.data;
+            let existingData = [];
+            
+            // Récupérer les anciennes données du cache
+            const cached = localStorage.getItem('nebula_twitch_data');
+            if (cached) {
+                existingData = JSON.parse(cached);
+            }
 
+            // FUSION : La clé est la Date. 
+            // Si le nouveau CSV a la même date, il écrase l'ancienne ligne (pratique pour la MAJ des revenus)
+            const dataMap = new Map();
+            existingData.forEach(row => dataMap.set(row.Date, row));
+            newData.forEach(row => dataMap.set(row.Date, row)); 
 
-        });
+            // Reconvertir en tableau plat
+            const mergedData = Array.from(dataMap.values());
+
+            // Sauvegarder dans la mémoire du navigateur
+            try {
+                localStorage.setItem('nebula_twitch_data', JSON.stringify(mergedData));
+            } catch(err) {
+                console.warn("Erreur de sauvegarde locale :", err);
+            }
+
+            // Lancer le calcul
+            processAndRenderData(mergedData);
+        }
     });
+});
+
+// ─── 3. CHARGEMENT AUTOMATIQUE AU DÉMARRAGE ───
+// C'est cette partie qui détecte s'il y a déjà des données en cache quand tu arrives sur la page !
+window.addEventListener('DOMContentLoaded', () => {
+    const cached = localStorage.getItem('nebula_twitch_data');
+    if (cached) {
+        const rawData = JSON.parse(cached);
+        processAndRenderData(rawData);
+    }
+});
+
+// ─── 4. FONCTION POUR LE BOUTON "VIDER" ───
+window.clearCache = function() {
+    if(confirm("Veux-tu vraiment vider le cache et supprimer tes données sauvegardées ?")) {
+        localStorage.removeItem('nebula_twitch_data');
+        location.reload(); // Recharge la page (tu retombes sur l'écran d'accueil vide)
+    }
+};
+
 
     function initUI() {
         ['metricA', 'metricB'].forEach(id => {
