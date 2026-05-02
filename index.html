@@ -368,6 +368,7 @@
         "Spectateurs uniques": { label: "Viewers Uniques", isAverage: false, desc: "Nombre total de personnes différentes ayant ouvert votre stream." },
         "Nouveaux followers": { label: "Followers", isAverage: false, desc: "Nombre de nouveaux utilisateurs ayant cliqué sur le bouton 'Suivre'." },
         "Cumul followers": { label: "Followers Cumulés", isAverage: false, desc: "Évolution globale de votre nombre de followers dans le temps." },
+        "Viewers impliqués": {     label: "Viewers Impliqués",    isAverage: false,     desc: "Nombre de spectateurs uniques ayant interagi avec le stream (chat, points de chaîne, clics, etc.)." },
         "Minutes regardées": { label: "Minutes Regardées", isAverage: false, desc: "Cumul du temps de visionnage de l'ensemble de vos spectateurs." },
         "Personnes sur le chat": { label: "Chatteurs Uniques", isAverage: false, desc: "Nombre de spectateurs uniques ayant envoyé au moins un message." },
         "Messages / Chatter": { label: "Messages / Chatter", isAverage: true, desc: "Nombre moyen de messages envoyés par chaque personne active sur le chat.", calc: r => r["Personnes sur le chat"] > 0 ? (r["Messages du chat"] / r["Personnes sur le chat"]) : 0 },
