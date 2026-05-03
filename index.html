@@ -1829,6 +1829,98 @@ function toggleStreamDetails() {
     }
 }
 
+// --- RACCOURCIS CLAVIER COMPLETS ---
+document.addEventListener('keydown', (event) => {
+    // Sécurité : on ignore les raccourcis si on tape dans un champ de texte ou un menu
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) return;
+
+    // --- 1. INSPECTEUR DE STREAMS (Flèches Gauche / Droite) ---
+    if (event.key === 'ArrowLeft') {
+        const btnPrev = document.getElementById('btnPrevStream');
+        if (btnPrev) btnPrev.click();
+        if (typeof charts !== 'undefined' && charts.main) charts.main.draw();
+    } 
+    else if (event.key === 'ArrowRight') {
+        const btnNext = document.getElementById('btnNextStream');
+        if (btnNext) btnNext.click();
+        if (typeof charts !== 'undefined' && charts.main) charts.main.draw();
+    }
+    
+    // --- 2. BOUTON "PLUS D'INFOS" (Espace) ---
+    else if (event.code === 'Space' || event.key === ' ') {
+        event.preventDefault(); 
+        const btnDetails = document.getElementById('btnToggleDetails');
+        if (btnDetails) btnDetails.click();
+    }
+
+    // --- 3. CHANGEMENT DE METRIQUE A (Flèches Haut / Bas) ---
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        event.preventDefault(); 
+        const metricSelect = document.getElementById('metricA');
+        
+        if (event.key === 'ArrowUp' && metricSelect.selectedIndex > 0) {
+            metricSelect.selectedIndex--; 
+            refresh();
+        } 
+        else if (event.key === 'ArrowDown' && metricSelect.selectedIndex < metricSelect.options.length - 1) {
+            metricSelect.selectedIndex++;
+            refresh();
+        }
+    }
+
+    // --- 4. PERIODES DE TEMPS & NAVIGATION (Clavier AZERTY haut) ---
+    else {
+        // On récupère TOUS les boutons ayant la classe .btn-preset (il y en a 8 en tout)
+        const presetBtns = document.querySelectorAll('.btn-preset');
+        if (presetBtns.length < 8) return; // Sécurité
+        
+        /* 
+           Ordre des boutons dans ton HTML :
+           [0] = ❮ (Précédent)
+           [1] = ❯ (Suivant)
+           [2] = 7J
+           [3] = 30J
+           [4] = 3M
+           [5] = 6M
+           [6] = 1A
+           [7] = MAX
+        */
+
+        switch(event.key) {
+            // Presets de durée (1 à 6 sur AZERTY)
+            case '&': case '1': 
+                presetBtns[2].click(); // 7J
+                break;
+            case 'é': case '2': 
+                presetBtns[3].click(); // 30J
+                break;
+            case '"': case '3': 
+                presetBtns[4].click(); // 3M
+                break;
+            case "'": case '4': 
+                presetBtns[5].click(); // 6M
+                break;
+            case '(': case '5': 
+                presetBtns[6].click(); // 1A
+                break;
+            case '-': case '6': 
+                presetBtns[7].click(); // MAX
+                break;
+                
+            // Périodes Précédente / Suivante (7 et 8 sur AZERTY)
+            case 'è': case '7': 
+                presetBtns[0].click(); // ❮ (shiftRange(-1))
+                break;
+            case '_': case '8': 
+                presetBtns[1].click(); // ❯ (shiftRange(1))
+                break;
+        }
+    }
+});
+
+
+
+
 
 
 
