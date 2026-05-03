@@ -1679,18 +1679,26 @@ function updateStreamInspector() {
     document.getElementById('btnNextStream').style.cursor = currentStreamIndex === currentStreamList.length - 1 ? "default" : "pointer";
 
     // 6. SYNCHRONISATION AVEC LE GRAPHIQUE PRINCIPAL
-    if (typeof mainChart !== 'undefined' && mainChart !== null) {
+    if (typeof charts !== 'undefined' && charts.main) {
         try {
-            mainChart.setActiveElements([
+            // Met en surbrillance les points
+            charts.main.setActiveElements([
                 { datasetIndex: 0, index: currentStreamIndex },
                 { datasetIndex: 1, index: currentStreamIndex }
             ]);
-            mainChart.tooltip.setActiveElements([
-                { datasetIndex: 0, index: currentStreamIndex }
-            ], { x: 0, y: 0 });
-            mainChart.update();
-        } catch(e) {}
+            
+            // Force le graphique à se redessiner (ce qui fait bouger la croix bleue)
+            charts.main.update();
+
+            // Met à jour l'encart noir (le tooltip) si la fonction existe
+            if (typeof updateTooltip === 'function') {
+                updateTooltip(charts.main, currentStreamIndex);
+            }
+        } catch(e) {
+            console.error("Erreur lors de la synchronisation du graphique:", e);
+        }
     }
+
 
 
 
