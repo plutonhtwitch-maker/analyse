@@ -424,7 +424,7 @@ const nebulaCrosshair = {
         ctx.restore();
 
         // Boucle d'animation si la croix n'est pas encore arrivée
-        if (Math.abs(crossPos.x - crossPos.targetX) > 0.1) {
+        if (Math.abs(crossPos.x - crossPos.targetX) > 0.1 || Math.abs(crossPos.y - crossPos.targetY) > 0.1) {
             window.requestAnimationFrame(() => chart.draw());
         }
     }
@@ -776,6 +776,7 @@ function renderMainChart(data) {
             chart.render();
         }
     }
+
 }
 
 
