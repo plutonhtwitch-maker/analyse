@@ -26,6 +26,13 @@
         }
 
         .container { padding: 20px; max-width: 1650px; margin: 0 auto; }
+
+
+        .chart-wrap canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
         
         .header { 
             display: flex; justify-content: space-between; align-items: center; 
@@ -361,6 +368,71 @@
     let currentStreamIndex = 0;
 
 
+
+// --- CONFIGURATION CROSSHAIR FIXE SUR SÉLECTION ---
+let crossPos = { x: null, y: null, targetX: null, targetY: null };
+let isMouseDown = false; // Pour savoir si on reste appuyé
+
+const nebulaCrosshair = {
+    id: 'nebulaCrosshair',
+    afterDraw(chart) {
+        // On récupère le point correspondant à l'index actuellement sélectionné
+        const datasetIndex = 0; 
+        const meta = chart.getDatasetMeta(datasetIndex);
+        
+        // Sécurité : si l'index n'existe pas encore
+        if (!meta.data[currentStreamIndex]) return;
+
+        const point = meta.data[currentStreamIndex];
+        const {ctx, chartArea: {top, bottom, left, right}} = chart;
+
+        // Cible = la position du point sélectionné
+        crossPos.targetX = point.x;
+        crossPos.targetY = point.y;
+
+        if (crossPos.x === null) { crossPos.x = point.x; crossPos.y = point.y; }
+
+        // Animation fluide
+        crossPos.x += (crossPos.targetX - crossPos.x) * 0.01;
+        crossPos.y += (crossPos.targetY - crossPos.y) * 0.01;
+
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
+
+        // Ligne Verticale
+        ctx.beginPath();
+        ctx.moveTo(crossPos.x, top);
+        ctx.lineTo(crossPos.x, bottom);
+        ctx.stroke();
+
+        // Ligne Horizontale
+        ctx.beginPath();
+        ctx.moveTo(left, crossPos.y);
+        ctx.lineTo(right, crossPos.y);
+        ctx.stroke();
+
+        // Point Focus
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00e5ff';
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(crossPos.x, crossPos.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Boucle d'animation si la croix n'est pas encore arrivée
+        if (Math.abs(crossPos.x - crossPos.targetX) > 0.1) {
+            window.requestAnimationFrame(() => chart.draw());
+        }
+    }
+};
+
+
+
+
     const METRICS_DICT = {
         "Spectateurs en moyenne": { label: "Spectateurs Moyens", isAverage: true, desc: "Nombre moyen de spectateurs connectés simultanément pendant le stream." },
         "Minutes passées en stream": { label: "Durée du Live", isAverage: false, desc: "Temps total de diffusion de votre stream." },
@@ -588,49 +660,128 @@ window.clearCache = function() {
         });
     }
 
-    function renderMainChart(data) {
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        if(charts.main) charts.main.destroy();
-        const mA = document.getElementById('metricA').value;
-        const mB = document.getElementById('metricB').value;
-        const sma = parseInt(document.getElementById('sma').value);
-        const streams = data.filter(d => d["Minutes passées en stream"] > 0);
-        const labels = streams.map(d => d._date.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'}));
-        const applySma = (key) => {
-            const raw = streams.map(d => d[key]||0);
-            if(sma <= 1) return raw;
-            return raw.map((_, i) => { const slice = raw.slice(Math.max(0, i-sma+1), i+1); return slice.reduce((a,b)=>a+b,0) / slice.length; });
-        };
-        const datasets = [{ label: METRICS_DICT[mA].label, data: applySma(mA), borderColor: '#00e5ff', backgroundColor: 'rgba(0, 229, 255, 0.1)', fill: true, tension: 0.4, yAxisID: 'y' }];
-        if(mB !== 'none') datasets.push({ label: METRICS_DICT[mB].label, data: applySma(mB), borderColor: '#9146FF', borderDash: [5,5], tension: 0.4, yAxisID: 'y1' });
-        
-        charts.main = new Chart(ctx, { 
-            type: 'line', 
-            data: { labels, datasets }, 
-            options: { 
-                onHover: (event, activeElements) => {
-                    if (activeElements && activeElements.length > 0) {
-                        const hoveredIndex = activeElements[0].index;
-                        if (typeof currentStreamList !== 'undefined' && currentStreamList && hoveredIndex >= 0 && hoveredIndex < currentStreamList.length) {
-                            if (currentStreamIndex !== hoveredIndex) {
-                                currentStreamIndex = hoveredIndex;
-                                updateStreamInspector();
-                            }
-                        }
-                    }
-                },
-                responsive: true, 
-                maintainAspectRatio: false, 
-                interaction: { mode: 'index', intersect: false }, 
-                plugins: { legend: { display: true, labels: { color: '#fff', font: { family: 'Orbitron', size: 10 } } } }, 
-                scales: { 
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#00e5ff' } }, 
-                    y1: { display: mB !== 'none', position: 'right', grid: { display: false }, ticks: { color: '#9146FF' } }, 
-                    x: { ticks: { color: '#666' } } 
-                } 
-            } 
+function renderMainChart(data) {
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    if(charts.main) charts.main.destroy();
+
+    const mA = document.getElementById('metricA').value;
+    const mB = document.getElementById('metricB').value;
+    const sma = parseInt(document.getElementById('sma').value);
+    const streams = data.filter(d => d["Minutes passées en stream"] > 0);
+    const labels = streams.map(d => d._date.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'}));
+
+    const applySma = (key) => {
+        const raw = streams.map(d => d[key]||0);
+        if(sma <= 1) return raw;
+        return raw.map((_, i) => { 
+            const slice = raw.slice(Math.max(0, i-sma+1), i+1); 
+            return slice.reduce((a,b)=>a+b,0) / slice.length; 
+        });
+    };
+
+    const datasets = [{ 
+        label: METRICS_DICT[mA].label, 
+        data: applySma(mA), 
+        borderColor: '#00e5ff', 
+        backgroundColor: 'rgba(0, 229, 255, 0.1)', 
+        fill: true, 
+        tension: 0.4, 
+        yAxisID: 'y' 
+    }];
+
+    if(mB !== 'none') {
+        datasets.push({ 
+            label: METRICS_DICT[mB].label, 
+            data: applySma(mB), 
+            borderColor: '#9146FF', 
+            borderDash: [5,5], 
+            tension: 0.4, 
+            yAxisID: 'y1' 
         });
     }
+    
+    charts.main = new Chart(ctx, { 
+        type: 'line', 
+        data: { labels, datasets }, 
+        plugins: [nebulaCrosshair],
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            // On autorise mousemove pour le "drag", mais on filtrera l'action dedans
+            events: ['mousedown', 'mousemove', 'mouseup', 'click', 'touchstart', 'touchmove', 'mouseout'],
+            
+            onHover: (event, activeElements) => {
+                // Si on clique et glisse (bouton gauche enfoncé)
+                if (activeElements && activeElements.length > 0 && event.native.buttons === 1) {
+                    const idx = activeElements[0].index;
+                    if (currentStreamIndex !== idx) {
+                        currentStreamIndex = idx;
+                        updateStreamInspector();
+                        // On force le tooltip à suivre la sélection
+                        updateTooltip(charts.main, idx);
+                    }
+                }
+            },
+            onClick: (event, activeElements) => {
+                if (activeElements && activeElements.length > 0) {
+                    const idx = activeElements[0].index;
+                    currentStreamIndex = idx;
+                    updateStreamInspector();
+                    updateTooltip(charts.main, idx);
+                }
+            },
+            interaction: { 
+                mode: 'index', 
+                intersect: false 
+            }, 
+            plugins: { 
+                legend: { 
+                    display: true, 
+                    labels: { color: '#fff', font: { family: 'Orbitron', size: 10 } } 
+                },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(10, 10, 15, 0.95)',
+                    titleFont: { family: 'Inter', weight: 'bold' },
+                    bodyFont: { family: 'Inter' },
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    displayColors: true,
+                    // Empêche le tooltip de disparaître quand on bouge la souris hors d'un point
+                    external: null 
+                }
+            }, 
+            scales: { 
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#00e5ff' } }, 
+                y1: { display: mB !== 'none', position: 'right', grid: { display: false }, ticks: { color: '#9146FF' } }, 
+                x: { ticks: { color: '#666' } } 
+            } 
+        } 
+    });
+
+    // Petit helper pour forcer l'affichage du tooltip sur l'index choisi
+    function updateTooltip(chart, index) {
+        const meta = chart.getDatasetMeta(0);
+        const point = meta.data[index];
+        
+        if (point) {
+            chart.tooltip.setActiveElements([
+                { datasetIndex: 0, index: index },
+                { datasetIndex: 1, index: index }
+            ], {
+                x: point.x,
+                y: point.y,
+            });
+            chart.render();
+        }
+    }
+
+    // Au chargement initial, on affiche le tooltip sur le dernier stream
+    setTimeout(() => updateTooltip(charts.main, currentStreamIndex), 100);
+}
+
+
 
 
 function renderMonthlyTrend() {
