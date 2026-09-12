@@ -79,20 +79,25 @@
         
         select { background: #000; color: white; border: 1px solid var(--border); padding: 7px 10px; border-radius: 6px; font-size: 0.82rem; outline: none; }
 
-        .ai-section { background: linear-gradient(160deg, #090910 0%, #111122 100%); border: 1px solid rgba(0, 255, 163, 0.25); }
+        .ai-section { 
+            background: linear-gradient(160deg, #090910 0%, #111122 100%); 
+            border: 1px solid rgba(0, 255, 163, 0.3); 
+        }
         .ai-btn { 
             background: linear-gradient(45deg, var(--twitch-purple), var(--accent-blue)); 
-            border: none; color: white; padding: 8px 16px; border-radius: 8px; 
+            border: none; color: white; padding: 9px 18px; border-radius: 8px; 
             font-weight: 800; cursor: pointer; font-family: 'Orbitron', sans-serif; 
-            font-size: 0.7rem; transition: 0.3s;
+            font-size: 0.72rem; transition: 0.3s;
         }
         .ai-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .ai-btn:not(:disabled):hover { box-shadow: 0 0 15px rgba(0, 229, 255, 0.6); }
 
-        #aiInsights h3 { color: var(--accent-green); font-family: 'Orbitron'; font-size: 0.95rem; margin: 12px 0 6px; }
-        #aiInsights ul { padding-left: 18px; margin-bottom: 10px; }
-        #aiInsights li { margin-bottom: 4px; }
-        #aiInsights p { margin-bottom: 8px; color: #d0d0d8; }
+        #aiInsights h3 { color: var(--accent-green); font-family: 'Orbitron'; font-size: 0.95rem; margin: 14px 0 6px; border-bottom: 1px solid rgba(0,255,163,0.15); padding-bottom: 4px; }
+        #aiInsights h4 { color: var(--accent-blue); font-size: 0.85rem; margin: 10px 0 4px; font-family: 'Orbitron'; }
+        #aiInsights ul { padding-left: 20px; margin-bottom: 10px; }
+        #aiInsights li { margin-bottom: 5px; color: #d0d0dc; font-size: 0.82rem; }
+        #aiInsights p { margin-bottom: 8px; color: #d0d0d8; font-size: 0.82rem; line-height: 1.5; }
+        #aiInsights strong { color: #fff; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -107,7 +112,7 @@
 
     <div id="dashboard" style="display:none;">
         <div class="header">
-            <div class="logo">NEBULA <span>PRO 8.0</span></div>
+            <div class="logo">NEBULA <span>PRO 8.5</span></div>
             <div id="activeDateRange" style="font-size: 0.85rem; font-family:'Orbitron'; color: var(--accent-blue);">STREAM INTELLIGENCE</div>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <button onclick="document.getElementById('csvInput').click()" style="background: var(--bg-card); color: white; border: 1px solid var(--twitch-purple); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron'; font-size: 0.72rem;">
@@ -323,11 +328,11 @@
 
             <div class="card span-3 row-2 ai-section">
                 <div class="chart-header">
-                    <div class="chart-title" style="color:var(--accent-green)">✨ GEMINI AI STRATÉGIE LIVE</div>
-                    <button id="geminiBtn" class="ai-btn" onclick="callGeminiAI()">LANCER ANALYSE</button>
+                    <div class="chart-title" style="color:var(--accent-green)">✨ GEMINI AI STRATÉGIE & AUDIT PRO</div>
+                    <button id="geminiBtn" class="ai-btn" onclick="callGeminiAI()">LANCER AUDIT COMPLET</button>
                 </div>
                 <div id="aiInsights" style="font-size:0.85rem; line-height:1.5; max-height:360px; overflow-y:auto; padding-right:10px;">
-                    <p style="color:var(--text-dim); text-align:center; padding-top:120px;">Prêt à analyser vos performances avec Gemini...</p>
+                    <p style="color:var(--text-dim); text-align:center; padding-top:120px;">Prêt à analyser l'intégralité de vos performances avec Gemini...</p>
                 </div>
             </div>
 
@@ -395,6 +400,7 @@
     };
 
     const METRICS_DICT = {
+        "_streamScore": { label: "⭐ Note Globale du Stream (0-100)", isAverage: true, desc: "Note globale calibrée dynamiquement par rapport à vos habitudes de stream récentes." },
         "Spectateurs en moyenne": { label: "Spectateurs Moyens", isAverage: true, desc: "Audience simultanée moyenne présente pendant les lives." },
         "Spectateurs max.": { label: "Pic d'Audience (Max)", isAverage: true, desc: "Record de spectateurs simultanés atteint au pic du stream." },
         "Spectateurs uniques": { label: "Viewers Uniques", isAverage: false, desc: "Nombre total de comptes différents ayant ouvert le stream." },
@@ -438,6 +444,7 @@
         
         window.db = db;
 
+        // Cumul followers & Subs glissants
         let cumul = 0;
         db.forEach(r => {
             cumul += (r["Nouveaux followers"] || 0);
@@ -455,6 +462,16 @@
                 }
             }
             r["Subs actifs"] = subsActifs;
+        });
+
+        // Calcul prédictif des notes globales de chaque stream pour les exploiter en graphiques
+        db.forEach(r => {
+            if ((r["Minutes passées en stream"] || 0) > 0) {
+                const dnaCalc = computeStreamDNA(r);
+                r["_streamScore"] = dnaCalc ? dnaCalc.globalScore : 50;
+            } else {
+                r["_streamScore"] = 0;
+            }
         });
 
         document.getElementById('welcomeScreen').style.display = 'none';
@@ -507,8 +524,8 @@
             el.innerHTML = id === 'metricB' ? '<option value="none">AUCUNE COMPARAISON</option>' : '';
             Object.keys(METRICS_DICT).forEach(k => el.add(new Option(METRICS_DICT[k].label, k)));
         });
-        document.getElementById('metricA').value = "Spectateurs en moyenne";
-        document.getElementById('metricB').value = "Minutes passées en stream";
+        document.getElementById('metricA').value = "_streamScore";
+        document.getElementById('metricB').value = "Spectateurs en moyenne";
         setTimeRange(30);
     }
 
@@ -968,7 +985,7 @@
     }
 
     // =========================================================================
-    // 🧬 STREAM DNA & SYSTÈME DE NOTATION DYNAMIQUE
+    // 🧬 STREAM DNA & NOTATION DYNAMIQUE ADAPTATIVE
     // =========================================================================
     const DNA_CATEGORIES = {
         community:  { label: "🎯 STREAM COMMUNAUTÉ",  color: "#00ffa3", desc: "Audience ultra-engagée, fidélité au top et chat en ébullition." },
@@ -985,22 +1002,19 @@
         const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 3600 * 1000);
         const sourceData = window.db || [];
         
-        // Échantillon adaptatif des 6 derniers mois (minimum 12 streams récents si historique plus court)
+        // Échantillon adaptatif des 6 derniers mois (minimum 12 streams récents si historique court)
         let recentStreams = sourceData.filter(s => s._date >= sixMonthsAgo && s._date <= now && (s["Minutes passées en stream"] || 0) > 30);
         if (recentStreams.length < 12) {
             recentStreams = sourceData.filter(s => s._date <= now && (s["Minutes passées en stream"] || 0) > 30).slice(-20);
         }
         if (recentStreams.length === 0) recentStreams = [stream];
 
-        // Calcul dynamique de percentile étiré avec gestion des ex-aequo
         function calculateDynamicAxisScore(val, arr) {
             if (!arr || arr.length < 2) return 50;
             const below = arr.filter(x => x < val).length;
             const equal = arr.filter(x => x === val).length;
-            // Percentile exact entre 0 et 1
             const pct = (below + 0.5 * equal) / arr.length;
             
-            // Expansion non-linéaire douce pour valoriser les gros écarts sans aplatir le centre
             if (pct >= 0.5) {
                 return Math.round(50 + 50 * Math.pow((pct - 0.5) / 0.5, 0.85));
             } else {
@@ -1050,20 +1064,14 @@
             reach: Math.max(5, Math.min(calculateDynamicAxisScore(reachRaw, ref.reach), 100))
         };
 
-        // Calcul du Score Global dynamique :
-        // 1. Moyenne pondérée standard
         const weights = {
             retention: 0.20, chatActivity: 0.15, growth: 0.20, 
             reach: 0.20, virality: 0.12, subConversion: 0.08, monetization: 0.05
         };
         const rawWeighted = Object.keys(weights).reduce((acc, k) => acc + dnaScores[k] * weights[k], 0);
-
-        // 2. Bonus "Highlight" basé sur les 2 meilleures composantes du stream
         const sortedVals = Object.values(dnaScores).sort((a, b) => b - a);
         const topStrengthBonus = Math.max(0, ((sortedVals[0] + sortedVals[1]) / 2) - 50) * 0.35;
 
-        // 3. Expansion de variance pour éliminer l'écrasement statistique autour de 50
-        // Permet d'atteindre facilement 80-95+ lors d'un live qui performe fort
         let finalGlobalScore = 50 + (rawWeighted - 50) * 1.55 + topStrengthBonus;
         finalGlobalScore = Math.max(8, Math.min(98, Math.round(finalGlobalScore)));
 
@@ -1113,7 +1121,6 @@
 
         const vals = axes.map(a => dna[a.key] ?? 50);
         
-        // Code couleur plus gratifiant et distinctif
         const scoreColor = globalScore >= 80 ? '#00ffa3' : 
                            globalScore >= 65 ? '#00e5ff' : 
                            globalScore >= 45 ? '#ffd700' : '#ff4f4d';
@@ -1272,7 +1279,7 @@
     }
 
     // =========================================================================
-    // 🧠 APPEL API GOOGLE GEMINI (MODÈLE KERBEROS STREAM)
+    // 🧠 AUDIT STRATÉGIQUE COMPLET AVEC GEMINI
     // =========================================================================
     async function callGeminiAI() {
         const btn = document.getElementById('geminiBtn');
@@ -1288,47 +1295,116 @@
             return;
         }
 
-        btn.innerText = "ANALYSE EN COURS...";
+        btn.innerText = "SYNTHÈSE MULTI-DIMENSIONS...";
         btn.disabled = true;
 
         try {
             const streams = db.filter(d => (d["Minutes passées en stream"] || 0) > 0);
+            
+            // 1. Métriques par période glissante
             const getMetricsPeriod = (days) => {
                 const end = db[db.length - 1]._date;
                 const start = new Date(end.getTime() - (days * 24 * 3600 * 1000));
                 const slice = streams.filter(d => d._date >= start);
                 if (!slice.length) return "Aucun stream";
-                const avgViewers = (slice.reduce((a, b) => a + (b["Spectateurs en moyenne"] || 0), 0) / slice.length).toFixed(1);
+                const count = slice.length;
+                const avgV = (slice.reduce((a, b) => a + (b["Spectateurs en moyenne"] || 0), 0) / count).toFixed(1);
+                const avgMaxV = (slice.reduce((a, b) => a + (b["Spectateurs max."] || 0), 0) / count).toFixed(1);
                 const totalFollows = slice.reduce((a, b) => a + (b["Nouveaux followers"] || 0), 0);
+                const totalSubs = slice.reduce((a, b) => a + (b["Nouveaux subs"] || 0), 0);
                 const totalRev = slice.reduce((a, b) => a + (b._revTotal || 0), 0).toFixed(1);
-                const avgRetention = (slice.reduce((a, b) => a + (b._stickiness || 0), 0) / slice.length).toFixed(1);
-                return `${slice.length} streams, Moyenne: ${avgViewers} viewers, Followers: +${totalFollows}, Rétention moy: ${avgRetention}min, Revenus: ${totalRev}$`;
+                const avgDuration = (slice.reduce((a, b) => a + (b["Minutes passées en stream"] || 0), 0) / (count * 60)).toFixed(1);
+                const avgRet = (slice.reduce((a, b) => a + (b._stickiness || 0), 0) / count).toFixed(1);
+                const avgLoyalty = (slice.reduce((a, b) => a + (b._loyaltyRate || 0), 0) / count).toFixed(1);
+                const avgScore = (slice.reduce((a, b) => a + (b._streamScore || 0), 0) / count).toFixed(0);
+                return `${count} lives (${avgDuration}h moy.) | Score moy: ${avgScore}/100 | Viewers moy: ${avgV} (Pic: ${avgMaxV}) | Rétention moy: ${avgRet}min | Fidélité habitués: ${avgLoyalty}% | Follows: +${totalFollows} | Subs: +${totalSubs} | CA: ${totalRev}$`;
             };
 
-            const recentStreamsSummary = streams.slice(-10).map(s => {
+            // 2. Performance par jour de la semaine
+            const dayNames = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+            const dayStats = [0,1,2,3,4,5,6].map(() => ({ count: 0, vSum: 0, scoreSum: 0 }));
+            streams.forEach(s => {
+                let day = s._date.getDay() - 1;
+                if (day === -1) day = 6;
+                dayStats[day].count++;
+                dayStats[day].vSum += (s["Spectateurs en moyenne"] || 0);
+                dayStats[day].scoreSum += (s._streamScore || 50);
+            });
+            const bestDaysSummary = dayStats
+                .map((d, i) => ({ day: dayNames[i], avgV: d.count ? (d.vSum / d.count).toFixed(1) : 0, avgScore: d.count ? (d.scoreSum / d.count).toFixed(0) : 0, count: d.count }))
+                .filter(d => d.count > 0)
+                .sort((a, b) => b.avgV - a.avgV)
+                .map(d => `${d.day}: ${d.avgV} viewers (Score ${d.avgScore}/100 sur ${d.count} lives)`)
+                .join(" | ");
+
+            // 3. Top 3 vs Flop 3 récents pour analyse comparative
+            const sortedByScore = [...streams].slice(-40).sort((a, b) => (b._streamScore || 0) - (a._streamScore || 0));
+            const topStreams = sortedByScore.slice(0, 3).map(s => 
+                `[${s._date.toLocaleDateString('fr-FR')}] Score: ${s._streamScore}/100, ${((s["Minutes passées en stream"]||0)/60).toFixed(1)}h, ${Math.round(s["Spectateurs en moyenne"]||0)}v (Max ${Math.round(s["Spectateurs max."]||0)}), Chat: ${s["Messages du chat"]||0} msgs, Follows: +${s["Nouveaux followers"]||0}, Fidélité: ${(s._loyaltyRate||0).toFixed(0)}%`
+            ).join("\n");
+            const bottomStreams = sortedByScore.slice(-3).map(s => 
+                `[${s._date.toLocaleDateString('fr-FR')}] Score: ${s._streamScore}/100, ${((s["Minutes passées en stream"]||0)/60).toFixed(1)}h, ${Math.round(s["Spectateurs en moyenne"]||0)}v (Max ${Math.round(s["Spectateurs max."]||0)}), Chat: ${s["Messages du chat"]||0} msgs, Follows: +${s["Nouveaux followers"]||0}, Fidélité: ${(s._loyaltyRate||0).toFixed(0)}%`
+            ).join("\n");
+
+            // 4. Chronologie des 15 derniers lives
+            const last15StreamsSummary = streams.slice(-15).map(s => {
                 const dStr = s._date.toLocaleDateString('fr-FR');
+                const score = s._streamScore || 50;
                 const dur = ((s["Minutes passées en stream"] || 0) / 60).toFixed(1);
                 const v = Math.round(s["Spectateurs en moyenne"] || 0);
                 const max = Math.round(s["Spectateurs max."] || 0);
-                const chat = s["Messages du chat"] || 0;
+                const uniq = s["Spectateurs uniques"] || 0;
+                const chatMsgs = s["Messages du chat"] || 0;
+                const chatters = s["Personnes sur le chat"] || 0;
+                const fol = s["Nouveaux followers"] || 0;
+                const subs = s["Nouveaux subs"] || 0;
+                const rev = (s._revTotal || 0).toFixed(1);
+                const ret = (s._stickiness || 0).toFixed(1);
                 const loy = (s._loyaltyRate || 0).toFixed(0);
-                return `[${dStr}] Durée: ${dur}h, Moy: ${v}v (Max: ${max}), Chat: ${chat} msgs, Fidélité anciens: ${loy}%`;
+                const raid = (s["Spectateurs d'hébergements et de raids (%)"] || 0).toFixed(0);
+                const adSec = s["Durée de publicité (en secondes) par heure"] || 0;
+
+                return `• [${dStr}] Score: ${score}/100 | Durée: ${dur}h | Moy: ${v}v (Pic: ${max}) | Uniques: ${uniq} | Ret: ${ret}min | Chat: ${chatMsgs} msgs (${chatters} chatters) | Follows: +${fol} | Subs: +${subs} | Fidélité: ${loy}% | Raids: ${raid}% | Pubs: ${adSec}s/h | CA: ${rev}$`;
             }).join("\n");
 
             const promptText = `
-Voici les statistiques consolidées de la chaîne Twitch :
-Historique :
+Voici les données d'analyse complètes et consolidées de ma chaîne Twitch :
+
+1. CADRAGE TEMPOREL GLOBAL :
 - 7 derniers jours : ${getMetricsPeriod(7)}
 - 30 derniers jours : ${getMetricsPeriod(30)}
 - 90 derniers jours : ${getMetricsPeriod(90)}
+- Année écoulée : ${getMetricsPeriod(365)}
 
-10 derniers streams individuels :
-${recentStreamsSummary}
+2. PERFORMANCE SELON LES JOURS :
+${bestDaysSummary}
 
-Fais une analyse stratégique percutante structurée avec les titres <h3> suivants :
-1. Dynamique récente (points forts observés et ruptures de tendance)
-2. Analyse de l'engagement (rétention, fidélisation habitués vs nouveaux, activité chat)
-3. 3 Recommandations concrètes pour les prochains lives
+3. BENCHMARK COMPARATIF (Top vs Flop récents) :
+--- Top 3 récents ---
+${topStreams}
+--- Flop 3 récents ---
+${bottomStreams}
+
+4. DÉTAIL DES 15 DERNIERS STREAMS (Chronologique) :
+${last15StreamsSummary}
+
+INSTRUCTIONS POUR LE RAPPORT STRATÉGIQUE :
+Fais un audit approfondi, sans langue de bois, orienté croissance et optimisation de stream. Structure impérativement ta réponse avec les 5 sections HTML suivantes (utilise exclusivement <h3>, <h4>, <p>, <ul>, <li>, <strong>) :
+
+<h3>1. Trajectoire & Dynamique Globale</h3>
+(Analyse la dynamique actuelle par rapport aux moyennes 30j/90j/1an : croissance, stagnation, essoufflement ou reprise. Identifie ce qui explique l'écart entre les meilleurs et les pires lives récents).
+
+<h3>2. Rétention & Entonnoir d'Engagement</h3>
+(Analyse la durée moyenne de visionnage, le ratio visiteurs uniques vs viewers simultanés, et la fidélisation des habitués face à l'accueil des nouveaux viewers).
+
+<h3>3. Énergie du Chat & Communauté</h3>
+(Évalue la vivacité du chat : messages par chatter, participation relative par rapport aux viewers connectés, et sentiment d'implication).
+
+<h3>4. Monétisation & Gestion Publicitaire</h3>
+(Rendement des subs payés/Prime, impact des coupures pubs sur la rétention horaire et valeur économique générée par heure).
+
+<h3>5. Plan d'Action Stratégique (3 Priorités Immédiates)</h3>
+(3 actions tactiques chirurgicales et concrètes à appliquer dès les prochains streams pour monter en note et en viewers).
             `;
 
             const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -1341,10 +1417,10 @@ Fais une analyse stratégique percutante structurée avec les titres <h3> suivan
                         { parts: [{ text: promptText }] }
                     ],
                     systemInstruction: {
-                        parts: [{ text: "Tu es Nebula AI, consultant stratégique pour créateurs de contenu et streamers Twitch. Sois concis, direct et analytique. Réponds exclusivement en HTML simple avec les balises <h3>, <p>, <ul>, <li>, <strong> sans aucune balise <html>, <head>, <body> ni blocs markdown ```html." }]
+                        parts: [{ text: "Tu es Nebula AI Pro, consultant et coach stratégique de haut niveau spécialisé dans le streaming Twitch et l'économie des créateurs. Tu analyses avec rigueur les métriques fournies pour délivrer des diagnostics clairs, pragmatiques et orientés résultats. Réponds uniquement en HTML structuré avec <h3>, <h4>, <p>, <ul>, <li>, <strong>, sans aucun bloc Markdown ```html." }]
                     },
                     generationConfig: {
-                        temperature: 0.7
+                        temperature: 0.65
                     }
                 })
             };
@@ -1365,7 +1441,7 @@ Fais une analyse stratégique percutante structurée avec les titres <h3> suivan
             console.error("Erreur Gemini :", error);
             aiContainer.innerHTML = `<p style="color:var(--accent-red)">Erreur : ${error.message}</p>`;
         } finally {
-            btn.innerText = "LANCER ANALYSE";
+            btn.innerText = "LANCER AUDIT COMPLET";
             btn.disabled = false;
         }
     }
