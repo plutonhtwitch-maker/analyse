@@ -332,11 +332,11 @@
 </div>
 
 <script>
-    // =========================================================================
-    // ⚙️ CONFIGURATION API GOOGLE GEMINI
-    // =========================================================================
-    const GEMINI_API_KEY = "COLLE_ICI_TA_CLE_AI_STUDIO"; // Ex: AIzaSy...
-    const GEMINI_MODEL = "gemini-2.5-flash"; 
+    // ==========================================
+    // ⚙️ VARIABLES DE CONFIGURATION GEMINI
+    // ==========================================
+    const GEMINI_API_KEY = "AQ.Ab8RN6Id8BMcy9Eqzif5xoffkD978L8-1-bThNQuhWG493NQOw"; 
+    const GEMINI_MODEL = "gemini-3.5-flash-lite"; // ou "gemini-3.8-flash"
     
     let db = [];
     let charts = {};
@@ -1087,7 +1087,7 @@
                         <span style="width:16px;">${a.icon}</span>
                         <span style="width:85px; color:#f5f5f7;">${a.label}</span>
                         <div style="flex:1; height:5px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
-                            <div style="width:${vals[i]}%; height:100%; background:${a.color};"></div>
+                            <div style="width:${vals[i]}\%; height:100\%; background:${a.color};"></div>
                         </div>
                         <span style="width:25px; font-weight:bold; color:${a.color}; text-align:right;">${vals[i]}</span>
                     </div>
@@ -1214,14 +1214,14 @@
     }
 
     // =========================================================================
-    // 🤖 APPEL DE L'API GOOGLE GEMINI (DIRECT)
+    // 🧠 APPEL API GOOGLE GEMINI (MODÈLE KERBEROS STREAM)
     // =========================================================================
     async function callGeminiAI() {
         const btn = document.getElementById('geminiBtn');
         const aiContainer = document.getElementById('aiInsights');
 
-        if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("COLLE_ICI")) {
-            aiContainer.innerHTML = "<p style='color:var(--accent-red); font-weight:bold;'>Veuillez renseigner votre clé API Google AI Studio dans la variable GEMINI_API_KEY en haut du script.</p>";
+        if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("remplace ton api key")) {
+            aiContainer.innerHTML = "<p style='color:var(--accent-red); font-weight:bold;'>Veuillez renseigner votre clé API dans la variable GEMINI_API_KEY en haut du script.</p>";
             return;
         }
 
@@ -1257,56 +1257,55 @@
                 return `[${dStr}] Durée: ${dur}h, Moy: ${v}v (Max: ${max}), Chat: ${chat} msgs, Fidélité anciens: ${loy}%`;
             }).join("\n");
 
-            const systemInstruction = "Tu es Nebula AI, consultant stratégique pour créateurs de contenu et streamers Twitch. Sois direct, analytique et orienté action. Utilise uniquement les balises HTML <h3>, <p>, <ul>, <li>, <strong> sans aucune balise <html>, <head>, <body> ni blocs Markdown.";
-
             const promptText = `
-Voici les données consolidées des streams Twitch :
+Voici les statistiques consolidées de la chaîne Twitch :
 Historique :
 - 7 derniers jours : ${getMetricsPeriod(7)}
 - 30 derniers jours : ${getMetricsPeriod(30)}
 - 90 derniers jours : ${getMetricsPeriod(90)}
 
-Détail des 10 derniers streams :
+10 derniers streams individuels :
 ${recentStreamsSummary}
 
-Fais une analyse stratégique structurée ainsi :
-1. Diagnostic de Dynamique Récente (croissance, stagnation, conversion)
-2. Analyse de Rétention & Engagement (implication du chat, habitués vs nouveaux)
-3. 3 Recommandations Stratégiques Clés pour optimiser les prochains lives.
+Fais une analyse stratégique percutante structurée avec les titres <h3> suivants :
+1. Dynamique récente (points forts observés et ruptures de tendance)
+2. Analyse de l'engagement (rétention, fidélisation habitués vs nouveaux, activité chat)
+3. 3 Recommandations concrètes pour les prochains lives
             `;
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-            
-            const payload = {
-                contents: [
-                    { role: "user", parts: [{ text: promptText }] }
-                ],
-                systemInstruction: {
-                    parts: [{ text: systemInstruction }]
-                }
-            };
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-            const response = await fetch(url, {
+            const requestOptions = {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+                body: JSON.stringify({
+                    contents: [
+                        { parts: [{ text: promptText }] }
+                    ],
+                    systemInstruction: {
+                        parts: [{ text: "Tu es Nebula AI, consultant stratégique pour créateurs de contenu et streamers Twitch. Sois concis, direct et analytique. Réponds exclusivement en HTML simple avec les balises <h3>, <p>, <ul>, <li>, <strong> sans aucune balise <html>, <head>, <body> ni blocs markdown ```html." }]
+                    },
+                    generationConfig: {
+                        temperature: 0.7
+                    }
+                })
+            };
 
-            const resData = await response.json();
-
-            if (resData.error) {
-                throw new Error(resData.error.message || `Code erreur : ${resData.error.code}`);
+            const response = await fetch(API_URL, requestOptions);
+            if (!response.ok) {
+                const errJson = await response.json().catch(() => ({}));
+                throw new Error(errJson.error?.message || `Code API incorrect : ${response.status}`);
             }
 
-            const candidate = resData.candidates && resData.candidates[0];
-            const outputText = candidate?.content?.parts?.[0]?.text || "<p>Aucune réponse reçue de Gemini.</p>";
-
-            const cleanHTML = outputText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
+            const responseData = await response.json();
+            let aiText = responseData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "<p>Aucune réponse générée.</p>";
+            
+            const cleanHTML = aiText.replace(/^```html\s*/i, '').replace(/```\s*$/i, '');
             aiContainer.innerHTML = cleanHTML;
 
-        } catch (err) {
-            console.error("Erreur Gemini :", err);
-            aiContainer.innerHTML = `<p style="color:var(--accent-red)">Erreur : ${err.message}</p>`;
+        } catch (error) {
+            console.error("Erreur Gemini :", error);
+            aiContainer.innerHTML = `<p style="color:var(--accent-red)">Erreur : ${error.message}</p>`;
         } finally {
             btn.innerText = "LANCER ANALYSE";
             btn.disabled = false;
