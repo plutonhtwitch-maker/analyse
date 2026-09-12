@@ -119,6 +119,7 @@
             </div>
         </div>
 
+        <!-- INSPECTEUR DE STREAM -->
         <div class="stream-inspector" style="background: linear-gradient(180deg, #09090f 0%, #12121e 100%); border: 1px solid rgba(0, 229, 255, 0.2); padding: 20px; border-radius: 14px; margin-bottom: 20px;">
             <div class="chart-header">
                 <div class="chart-title">🔎 INSPECTEUR DE STREAM (ANALYSE LIVE PAR LIVE)</div>
@@ -133,6 +134,7 @@
                 </div>
             </div>
 
+            <!-- Ligne 1 : Essentiels -->
             <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; margin-bottom: 12px;">
                 <div style="position: relative; background: rgba(0,0,0,0.45); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
                     <div style="font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase;">Temps live</div>
@@ -178,6 +180,7 @@
                 </div>
             </div>
 
+            <!-- Ligne 2 : Détails avancés -->
             <div id="streamDetailsRow" style="display: none; grid-template-columns: repeat(8, 1fr); gap: 10px; margin-bottom: 15px;">
                 <div style="position: relative; background: rgba(0,0,0,0.45); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
                     <div style="font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase;">Vues Live</div>
@@ -221,9 +224,10 @@
                 </div>
             </div>
 
+            <!-- STREAM DNA -->
             <div class="card" style="border: 1px solid rgba(0, 229, 255, 0.18); background: linear-gradient(135deg, #090910 0%, #0e0e1a 100%);">
                 <div class="chart-header" style="margin-bottom: 4px;">
-                    <div class="chart-title">🧬 STREAM DNA <span style="font-family:'Inter'; font-size:0.75rem; color:var(--text-dim); font-weight:400;">— Empreinte génétique & analyse comparative</span></div>
+                    <div class="chart-title">🧬 STREAM DNA <span style="font-family:'Inter'; font-size:0.75rem; color:var(--text-dim); font-weight:400;">— Empreinte dynamique (benchmark glissant adaptatif)</span></div>
                 </div>
                 <div style="height:1px; background: linear-gradient(90deg, rgba(0,229,255,0.2), transparent); margin-bottom: 15px;"></div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: center;">
@@ -963,13 +967,16 @@
         document.getElementById('correlationMatrix').innerHTML = html;
     }
 
+    // =========================================================================
+    // 🧬 STREAM DNA & SYSTÈME DE NOTATION DYNAMIQUE
+    // =========================================================================
     const DNA_CATEGORIES = {
-        community:  { label: "🎯 STREAM COMMUNAUTÉ",  color: "#00ffa3", desc: "Audience très engagée, forte fidélité et discussions intenses dans le tchat." },
-        viral:      { label: "🚀 STREAM VIRAL",        color: "#ff4f4d", desc: "Pic d'audience élevé et découverte par de nouveaux spectateurs." },
-        profitable: { label: "💰 STREAM RENTABLE",     color: "#ffd700", desc: "Excellente efficacité monétaire (subs, bits ou pubs rapportés à la durée)." },
-        balanced:   { label: "⚖️ STREAM ÉQUILIBRÉ",   color: "#00e5ff", desc: "Performances très homogènes sur tous les piliers de votre chaîne." },
-        growth:     { label: "📈 STREAM CROISSANCE",   color: "#9146FF", desc: "Fort taux de conversion de nouveaux followers." },
-        quiet:      { label: "😴 STREAM TRANSITION",   color: "#888899", desc: "Live plus calme, idéal pour tester des formats sans pression." }
+        community:  { label: "🎯 STREAM COMMUNAUTÉ",  color: "#00ffa3", desc: "Audience ultra-engagée, fidélité au top et chat en ébullition." },
+        viral:      { label: "🚀 STREAM VIRAL",        color: "#ff4f4d", desc: "Pic d'audience puissant et découverte par de nouveaux spectateurs." },
+        profitable: { label: "💰 STREAM RENTABLE",     color: "#ffd700", desc: "Excellente efficacité monétaire (subs, bits ou pubs rapportés au temps)." },
+        balanced:   { label: "⚖️ STREAM ÉQUILIBRÉ",   color: "#00e5ff", desc: "Performances très saines et homogènes sur tous les piliers de ta chaîne." },
+        growth:     { label: "📈 STREAM CROISSANCE",   color: "#9146FF", desc: "Gros afflux et conversion de nouveaux followers." },
+        quiet:      { label: "😴 STREAM CALME",        color: "#888899", desc: "Live en retrait par rapport à ta moyenne récente. Idéal pour tester sans enjeu." }
     };
 
     function computeStreamDNA(stream) {
@@ -977,13 +984,28 @@
         const now = stream._date || new Date();
         const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 3600 * 1000);
         const sourceData = window.db || [];
-        const recentStreams = sourceData.filter(s => s._date >= sixMonthsAgo && s._date <= now && (s["Minutes passées en stream"] || 0) > 30);
+        
+        // Échantillon adaptatif des 6 derniers mois (minimum 12 streams récents si historique plus court)
+        let recentStreams = sourceData.filter(s => s._date >= sixMonthsAgo && s._date <= now && (s["Minutes passées en stream"] || 0) > 30);
+        if (recentStreams.length < 12) {
+            recentStreams = sourceData.filter(s => s._date <= now && (s["Minutes passées en stream"] || 0) > 30).slice(-20);
+        }
+        if (recentStreams.length === 0) recentStreams = [stream];
 
-        function pct(val, arr) {
+        // Calcul dynamique de percentile étiré avec gestion des ex-aequo
+        function calculateDynamicAxisScore(val, arr) {
             if (!arr || arr.length < 2) return 50;
-            const sorted = [...arr].sort((a, b) => a - b);
-            const below = sorted.filter(x => x < val).length;
-            return Math.round((below / (sorted.length - 1)) * 100);
+            const below = arr.filter(x => x < val).length;
+            const equal = arr.filter(x => x === val).length;
+            // Percentile exact entre 0 et 1
+            const pct = (below + 0.5 * equal) / arr.length;
+            
+            // Expansion non-linéaire douce pour valoriser les gros écarts sans aplatir le centre
+            if (pct >= 0.5) {
+                return Math.round(50 + 50 * Math.pow((pct - 0.5) / 0.5, 0.85));
+            } else {
+                return Math.round(50 - 50 * Math.pow((0.5 - pct) / 0.5, 0.85));
+            }
         }
 
         const duration = (parseFloat(stream["Minutes passées en stream"]) || 0) / 60;
@@ -1018,28 +1040,52 @@
             mono: recentStreams.map(s => (s["Minutes passées en stream"] || 0) > 0 ? (s._revTotal || 0) / (s["Minutes passées en stream"] / 60) : 0)
         };
 
+        const dnaScores = {
+            retention: Math.max(5, Math.min(calculateDynamicAxisScore(retentionRaw, ref.retention), 100)),
+            chatActivity: Math.max(5, Math.min(calculateDynamicAxisScore(chatRaw, ref.chat), 100)),
+            subConversion: Math.max(5, Math.min(calculateDynamicAxisScore(subConvRaw, ref.subConv), 100)),
+            virality: Math.max(5, Math.min(calculateDynamicAxisScore(viralityRaw, ref.virality), 100)),
+            monetization: Math.max(5, Math.min(calculateDynamicAxisScore(monoRaw, ref.mono), 100)),
+            growth: Math.max(5, Math.min(calculateDynamicAxisScore(growthRaw, ref.growth), 100)),
+            reach: Math.max(5, Math.min(calculateDynamicAxisScore(reachRaw, ref.reach), 100))
+        };
+
+        // Calcul du Score Global dynamique :
+        // 1. Moyenne pondérée standard
+        const weights = {
+            retention: 0.20, chatActivity: 0.15, growth: 0.20, 
+            reach: 0.20, virality: 0.12, subConversion: 0.08, monetization: 0.05
+        };
+        const rawWeighted = Object.keys(weights).reduce((acc, k) => acc + dnaScores[k] * weights[k], 0);
+
+        // 2. Bonus "Highlight" basé sur les 2 meilleures composantes du stream
+        const sortedVals = Object.values(dnaScores).sort((a, b) => b - a);
+        const topStrengthBonus = Math.max(0, ((sortedVals[0] + sortedVals[1]) / 2) - 50) * 0.35;
+
+        // 3. Expansion de variance pour éliminer l'écrasement statistique autour de 50
+        // Permet d'atteindre facilement 80-95+ lors d'un live qui performe fort
+        let finalGlobalScore = 50 + (rawWeighted - 50) * 1.55 + topStrengthBonus;
+        finalGlobalScore = Math.max(8, Math.min(98, Math.round(finalGlobalScore)));
+
         return {
-            retention: Math.max(0, Math.min(pct(retentionRaw, ref.retention), 100)),
-            chatActivity: Math.max(0, Math.min(pct(chatRaw, ref.chat), 100)),
-            subConversion: Math.max(0, Math.min(pct(subConvRaw, ref.subConv), 100)),
-            virality: Math.max(0, Math.min(pct(viralityRaw, ref.virality), 100)),
-            monetization: Math.max(0, Math.min(pct(monoRaw, ref.mono), 100)),
-            growth: Math.max(0, Math.min(pct(growthRaw, ref.growth), 100)),
-            reach: Math.max(0, Math.min(pct(reachRaw, ref.reach), 100))
+            axes: dnaScores,
+            globalScore: finalGlobalScore
         };
     }
 
-    function classifyStream(dna) {
-        const avg = (dna.retention + dna.chatActivity + dna.subConversion + dna.virality + dna.monetization + dna.growth) / 6;
-        if (avg < 30) return 'quiet';
+    function classifyStream(dnaAxes) {
+        const vals = Object.values(dnaAxes);
+        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+        if (avg < 35) return 'quiet';
+
         const traits = [
-            { key: 'viral', score: (dna.virality + dna.growth) / 2 - avg },
-            { key: 'profitable', score: (dna.monetization + dna.subConversion) / 2 - avg },
-            { key: 'community', score: (dna.chatActivity + dna.retention) / 2 - avg },
-            { key: 'growth', score: dna.growth - avg }
+            { key: 'viral', score: (dnaAxes.virality + dnaAxes.growth) / 2 - avg },
+            { key: 'profitable', score: (dnaAxes.monetization + dnaAxes.subConversion) / 2 - avg },
+            { key: 'community', score: (dnaAxes.chatActivity + dnaAxes.retention) / 2 - avg },
+            { key: 'growth', score: dnaAxes.growth - avg }
         ];
         traits.sort((a, b) => b.score - a.score);
-        if (traits[0].score < 10) return 'balanced';
+        if (traits[0].score < 8) return 'balanced';
         return traits[0].key;
     }
 
@@ -1047,9 +1093,11 @@
         const canvas = document.getElementById('dnaRadar');
         if (!canvas || !stream) return;
 
-        const dna = computeStreamDNA(stream);
-        if (!dna) return;
+        const dnaData = computeStreamDNA(stream);
+        if (!dnaData) return;
 
+        const dna = dnaData.axes;
+        const globalScore = dnaData.globalScore;
         const category = classifyStream(dna);
         const cat = DNA_CATEGORIES[category];
 
@@ -1063,22 +1111,31 @@
             { key: 'reach', label: 'Portée', icon: '📡', color: '#38bdf8', desc: 'Volume de spectateurs uniques sur le live.' }
         ];
 
-        const vals = axes.map(a => dna[a.key] ?? 0);
-        const globalScore = Math.round(
-            dna.retention * 0.22 + dna.chatActivity * 0.15 + dna.growth * 0.18 +
-            dna.reach * 0.20 + dna.virality * 0.12 + dna.subConversion * 0.08 + dna.monetization * 0.05
-        );
-        const scoreColor = globalScore >= 70 ? '#00ffa3' : globalScore >= 45 ? '#00e5ff' : '#ff4f4d';
+        const vals = axes.map(a => dna[a.key] ?? 50);
+        
+        // Code couleur plus gratifiant et distinctif
+        const scoreColor = globalScore >= 80 ? '#00ffa3' : 
+                           globalScore >= 65 ? '#00e5ff' : 
+                           globalScore >= 45 ? '#ffd700' : '#ff4f4d';
+
+        let scoreAppreciation = globalScore >= 85 ? "MASTERCLASS" : 
+                                globalScore >= 70 ? "TRÈS BON STREAM" : 
+                                globalScore >= 50 ? "STREAM SOLIDE" : 
+                                globalScore >= 35 ? "STREAM CALME" : "STREAM CREUX";
 
         document.getElementById('dnaInsight').innerHTML = `
             <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
-                <div style="width:62px; height:62px; border-radius:50%; border:2px solid ${scoreColor}60; background:${scoreColor}10; display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0;">
-                    <span style="font-size:1.3rem; font-weight:800; color:${scoreColor}; font-family:'Orbitron';">${globalScore}</span>
-                    <span style="font-size:0.5rem; color:var(--text-dim); letter-spacing:1px;">SCORE</span>
+                <div style="width:68px; height:68px; border-radius:50%; border:2px solid ${scoreColor}80; background:${scoreColor}14; display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0; box-shadow: 0 0 15px ${scoreColor}33;">
+                    <span style="font-size:1.45rem; font-weight:900; color:${scoreColor}; font-family:'Orbitron';">${globalScore}</span>
+                    <span style="font-size:0.5rem; color:var(--text-dim); letter-spacing:1px;">/100</span>
                 </div>
                 <div>
-                    <div style="font-size:1rem; font-weight:700; color:${cat.color}; margin-bottom:4px;">${cat.label}</div>
-                    <div style="font-size:0.8rem; color:var(--text-dim); line-height:1.4;">${cat.desc}</div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.75rem; font-weight:800; color:${scoreColor}; font-family:'Orbitron';">${scoreAppreciation}</span>
+                        <span style="color:var(--text-dim); font-size:0.75rem;">•</span>
+                        <span style="font-size:0.85rem; font-weight:700; color:${cat.color};">${cat.label}</span>
+                    </div>
+                    <div style="font-size:0.78rem; color:var(--text-dim); line-height:1.4; margin-top:3px;">${cat.desc}</div>
                 </div>
             </div>
             <div style="display:flex; flex-direction:column; gap:6px;">
@@ -1086,10 +1143,10 @@
                     <div style="display:flex; align-items:center; gap:10px; font-size:0.75rem;">
                         <span style="width:16px;">${a.icon}</span>
                         <span style="width:85px; color:#f5f5f7;">${a.label}</span>
-                        <div style="flex:1; height:5px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
-                            <div style="width:${vals[i]}\%; height:100\%; background:${a.color};"></div>
+                        <div style="flex:1; height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
+                            <div style="width:${vals[i]}%; height:100%; background:${a.color}; box-shadow: 0 0 8px ${a.color}55;"></div>
                         </div>
-                        <span style="width:25px; font-weight:bold; color:${a.color}; text-align:right;">${vals[i]}</span>
+                        <span style="width:28px; font-weight:bold; color:${a.color}; text-align:right;">${vals[i]}</span>
                     </div>
                 `).join('')}
             </div>
@@ -1104,10 +1161,11 @@
                 datasets: [{
                     data: vals,
                     borderColor: cat.color,
-                    backgroundColor: cat.color + '22',
+                    backgroundColor: cat.color + '25',
                     pointBackgroundColor: cat.color,
                     borderWidth: 2,
-                    pointRadius: 4
+                    pointRadius: 4.5,
+                    pointHoverRadius: 7
                 }]
             },
             options: {
@@ -1120,8 +1178,8 @@
                         max: 100,
                         grid: { color: 'rgba(255,255,255,0.06)' },
                         angleLines: { color: 'rgba(255,255,255,0.08)' },
-                        pointLabels: { color: '#9aa0a6', font: { size: 10 } },
-                        ticks: { display: false }
+                        pointLabels: { color: '#9aa0a6', font: { size: 10.5, family: 'Inter' } },
+                        ticks: { display: false, stepSize: 25 }
                     }
                 }
             }
