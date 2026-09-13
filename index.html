@@ -77,7 +77,7 @@
         .chart-title { font-family: 'Orbitron', sans-serif; font-size: 0.82rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px; }
         .chart-wrap { height: 320px; width: 100%; position: relative; }
         
-        select { background: #000; color: white; border: 1px solid var(--border); padding: 7px 10px; border-radius: 6px; font-size: 0.82rem; outline: none; }
+        select { background: #000; color: white; border: 1px solid var(--border); padding: 7px 10px; border-radius: 6px; font-size: 0.82rem; outline: none; max-width: 260px; }
 
         .ai-section { 
             background: linear-gradient(160deg, #090910 0%, #111122 100%); 
@@ -112,7 +112,7 @@
 
     <div id="dashboard" style="display:none;">
         <div class="header">
-            <div class="logo">NEBULA <span>PRO 8.5</span></div>
+            <div class="logo">NEBULA <span>PRO 8.8</span></div>
             <div id="activeDateRange" style="font-size: 0.85rem; font-family:'Orbitron'; color: var(--accent-blue);">STREAM INTELLIGENCE</div>
             <div style="display: flex; gap: 10px; align-items: center;">
                 <button onclick="document.getElementById('csvInput').click()" style="background: var(--bg-card); color: white; border: 1px solid var(--twitch-purple); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron'; font-size: 0.72rem;">
@@ -232,7 +232,7 @@
             <!-- STREAM DNA -->
             <div class="card" style="border: 1px solid rgba(0, 229, 255, 0.18); background: linear-gradient(135deg, #090910 0%, #0e0e1a 100%);">
                 <div class="chart-header" style="margin-bottom: 4px;">
-                    <div class="chart-title">🧬 STREAM DNA <span style="font-family:'Inter'; font-size:0.75rem; color:var(--text-dim); font-weight:400;">— Empreinte dynamique (benchmark glissant adaptatif)</span></div>
+                    <div class="chart-title">🧬 STREAM DNA <span style="font-family:'Inter'; font-size:0.75rem; color:var(--text-dim); font-weight:400;">— Empreinte calibrée multi-axes (benchmark glissant 6M)</span></div>
                 </div>
                 <div style="height:1px; background: linear-gradient(90deg, rgba(0,229,255,0.2), transparent); margin-bottom: 15px;"></div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: center;">
@@ -345,7 +345,7 @@
     // ⚙️ VARIABLES DE CONFIGURATION GEMINI
     // ==========================================
     const GEMINI_API_KEY = "AQ.Ab8RN6Id8BMcy9Eqzif5xoffkD978L8-1-bThNQuhWG493NQOw"; 
-    const GEMINI_MODEL = "gemini-3.8-flash"; // ou "gemini-3.8-flash"
+    const GEMINI_MODEL = "gemini-3.8-flash"; 
     
     let db = [];
     let charts = {};
@@ -399,27 +399,75 @@
         }
     };
 
+    // =========================================================================
+    // 📚 DICTIONNAIRE EXHAUSTIF DES MÉTRIQUES (BRUTES & CALCULÉES)
+    // =========================================================================
     const METRICS_DICT = {
-        "_streamScore": { label: "⭐ Note Globale du Stream (0-100)", isAverage: true, desc: "Note globale calibrée dynamiquement par rapport à vos habitudes de stream récentes." },
+        // --- SCORES GLOBAUX & SYNTHÈSE ---
+        "_streamScore": { label: "⭐ Note Globale du Stream (0-100)", isAverage: true, desc: "Note globale calibrée dynamiquement par rapport à vos habitudes récentes." },
+        
+        // --- AUDIENCE & REACH ---
         "Spectateurs en moyenne": { label: "Spectateurs Moyens", isAverage: true, desc: "Audience simultanée moyenne présente pendant les lives." },
         "Spectateurs max.": { label: "Pic d'Audience (Max)", isAverage: true, desc: "Record de spectateurs simultanés atteint au pic du stream." },
         "Spectateurs uniques": { label: "Viewers Uniques", isAverage: false, desc: "Nombre total de comptes différents ayant ouvert le stream." },
+        "Vues live": { label: "Vues Live (Clics bruts)", isAverage: false, desc: "Nombre total de lancements de vidéo en direct." },
+        "_liveViewsPerUnique": { label: "Clics / Viewer Unique", isAverage: true, desc: "Nombre moyen de clics/reconnexions par spectateur unique.", calc: r => r["Spectateurs uniques"] > 0 ? r["Vues live"] / r["Spectateurs uniques"] : 0 },
+        "Minutes regardées": { label: "Minutes Regardées (Total)", isAverage: false, desc: "Cumul du temps passé par l'ensemble de votre audience." },
         "Minutes passées en stream": { label: "Durée Stream (Min)", isAverage: false, desc: "Temps total d'émission en minutes." },
-        "Minutes regardées": { label: "Minutes Regardées", isAverage: false, desc: "Cumul du temps passé par l'ensemble de votre audience." },
+        "_durationHours": { label: "Durée Stream (Heures)", isAverage: false, desc: "Temps de live exprimé en heures.", calc: r => (r["Minutes passées en stream"] || 0) / 60 },
+        
+        // --- RÉTENTION & ENGAGEMENT ---
+        "_stickiness": { label: "Rétention Moyenne (Min/Viewer)", isAverage: true, desc: "Durée moyenne de visionnage par spectateur unique.", calc: r => r["Spectateurs uniques"] > 0 ? r["Minutes regardées"] / r["Spectateurs uniques"] : 0 },
+        "_retentionRelative": { label: "Rétention Relative (% du Live)", isAverage: true, desc: "Part du live regardée en moyenne par un viewer unique.", calc: r => (r["Spectateurs uniques"] > 0 && r["Minutes passées en stream"] > 0) ? ((r["Minutes regardées"] / r["Spectateurs uniques"]) / r["Minutes passées en stream"]) * 100 : 0 },
+        "Viewers impliqués": { label: "Viewers Impliqués (Total)", isAverage: false, desc: "Spectateurs ayant posé une action (chat, emotes, récompenses)." },
+        "_engagedRate": { label: "Taux d'Implication (%)", isAverage: true, desc: "Pourcentage des viewers uniques devenus impliqués.", calc: r => r["Spectateurs uniques"] > 0 ? (r["Viewers impliqués"] / r["Spectateurs uniques"]) * 100 : 0 },
+        "Anciens viewers impliqués": { label: "Anciens Viewers Impliqués", isAverage: false, desc: "Habitués ayant interagi pendant la session." },
+        "Nouveaux viewers impliqués": { label: "Nouveaux Viewers Impliqués", isAverage: false, desc: "Nouveaux spectateurs ayant fait leur première interaction." },
+        "_loyaltyRate": { label: "Taux de Fidélisation (%)", isAverage: true, desc: "Proportion d'anciens viewers impliqués parmi les engagés.", calc: r => { const total = (r["Anciens viewers impliqués"]||0) + (r["Nouveaux viewers impliqués"]||0); return total > 0 ? (r["Anciens viewers impliqués"] / total) * 100 : 0; } },
+
+        // --- TCHAT & COMMUNAUTÉ ---
+        "Messages du chat": { label: "Messages du Chat (Total)", isAverage: false, desc: "Nombre total de messages postés sur l'ensemble du stream." },
+        "Personnes sur le chat": { label: "Chatteurs Uniques", isAverage: false, desc: "Nombre d'utilisateurs distincts ayant écrit au moins un message." },
+        "Messages / Chatter": { label: "Messages / Chatter Actif", isAverage: true, desc: "Intensité de discussion : volume moyen par participant au chat.", calc: r => r["Personnes sur le chat"] > 0 ? (r["Messages du chat"] / r["Personnes sur le chat"]) : 0 },
+        "_chatMessagesPerUnique": { label: "Messages / Viewer Unique", isAverage: true, desc: "Volume de messages rapporté au trafic total.", calc: r => r["Spectateurs uniques"] > 0 ? r["Messages du chat"] / r["Spectateurs uniques"] : 0 },
+        "_chatRate": { label: "Taux de Participation Chat (%)", isAverage: true, desc: "Part des spectateurs uniques ayant écrit dans le tchat.", calc: r => r["Spectateurs uniques"] > 0 ? (r["Personnes sur le chat"] / r["Spectateurs uniques"]) * 100 : 0 },
+
+        // --- CROISSANCE & VIRALITÉ ---
         "Nouveaux followers": { label: "Nouveaux Followers", isAverage: false, desc: "Gains nets d'abonnements gratuits (follows)." },
         "Cumul followers": { label: "Cumul Followers", isAverage: false, desc: "Nombre total estimé de followers dans le temps." },
-        "Viewers impliqués": { label: "Viewers Impliqués", isAverage: false, desc: "Spectateurs ayant posé une action (chat, emotes, récompenses de chaîne)." },
-        "Personnes sur le chat": { label: "Chatteurs Uniques", isAverage: false, desc: "Nombre d'utilisateurs distincts ayant écrit au moins un message." },
-        "Messages du chat": { label: "Volume Messages Chat", isAverage: false, desc: "Total des messages postés dans le tchat." },
-        "Messages / Chatter": { label: "Messages / Chatter", isAverage: true, desc: "Intensité de la discussion : messages moyens par participant.", calc: r => r["Personnes sur le chat"] > 0 ? (r["Messages du chat"] / r["Personnes sur le chat"]) : 0 },
-        "Nouveaux subs": { label: "Nouveaux Subs (Jour)", isAverage: false, desc: "Cumul des subs payés, Prime et offerts générés sur la date." },
-        "Subs actifs": { label: "Subs Actifs (30j)", isAverage: false, desc: "Total glissant des subs payés et Prime actifs sur les 30 derniers jours." },
-        "_revTotal": { label: "Revenus Totaux ($)", isAverage: false, desc: "Tous revenus Twitch combinés (Subs, Bits, Pubs, Prime, Turbo)." },
-        "_stickiness": { label: "Rétention Moyenne (Min)", isAverage: true, desc: "Durée moyenne de visionnage par spectateur unique.", calc: r => r["Spectateurs uniques"] > 0 ? r["Minutes regardées"] / r["Spectateurs uniques"] : 0 },
         "_convRate": { label: "Taux Conversion Follow (%)", isAverage: true, desc: "Pourcentage des viewers uniques convertis en followers.", calc: r => r["Spectateurs uniques"] > 0 ? (r["Nouveaux followers"] / r["Spectateurs uniques"]) * 100 : 0 },
-        "_chatRate": { label: "Taux Engagement Chat (%)", isAverage: true, desc: "Part des spectateurs uniques ayant participé activement au chat.", calc: r => r["Spectateurs uniques"] > 0 ? (r["Personnes sur le chat"] / r["Spectateurs uniques"]) * 100 : 0 },
-        "_loyaltyRate": { label: "Taux de Fidélisation (%)", isAverage: true, desc: "Proportion d'anciens viewers impliqués parmi l'ensemble des engagés.", calc: r => { const total = (r["Anciens viewers impliqués"]||0) + (r["Nouveaux viewers impliqués"]||0); return total > 0 ? (r["Anciens viewers impliqués"] / total) * 100 : 0; } },
+        "Spectateurs d'hébergements et de raids (%)": { label: "Audience Raids & Hosts (%)", isAverage: true, desc: "Part de l'audience issue d'hébergements et de raids entrants." },
+        "Clips créés": { label: "Clips Créés", isAverage: false, desc: "Nombre de clips capturés par la communauté." },
+        "Visionnements clips": { label: "Vues de Clips (Total)", isAverage: false, desc: "Nombre total de visionnages de vos clips." },
+        "Vues de clips à la une": { label: "Vues Clips à la Une", isAverage: false, desc: "Vues générées par les clips mis en avant." },
+        "Vues de clips non mis à la une": { label: "Vues Clips Non Mis à la Une", isAverage: false, desc: "Vues organiques sur les clips classiques." },
+
+        // --- REVENUS & MONÉTISATION ---
+        "_revTotal": { label: "Revenus Totaux ($)", isAverage: false, desc: "Tous revenus Twitch combinés (Subs, Bits, Pubs, Prime, Turbo)." },
         "_hourlyEarnings": { label: "Taux Horaire ($/H)", isAverage: true, desc: "Revenus moyens générés par heure d'antenne.", calc: r => r["Minutes passées en stream"] > 0 ? r._revTotal / (r["Minutes passées en stream"] / 60) : 0 },
+        "_revPerUnique": { label: "Valeur / Viewer Unique ($)", isAverage: true, desc: "Revenu moyen rapporté à chaque spectateur unique passé.", calc: r => r["Spectateurs uniques"] > 0 ? r._revTotal / r["Spectateurs uniques"] : 0 },
+        "Nouveaux subs": { label: "Nouveaux Subs (Total Jour)", isAverage: false, desc: "Cumul des subs payés, Prime et offerts générés sur la date." },
+        "Subs actifs": { label: "Subs Actifs Glissants (30j)", isAverage: false, desc: "Total glissant des subs payés et Prime actifs sur 30 jours." },
+        "Revenu issu des abonnements": { label: "Revenu Subs Récurrents ($)", isAverage: false, desc: "Revenu généré par les abonnements payés récurrents." },
+        "Revenu Prime": { label: "Revenu Subs Prime ($)", isAverage: false, desc: "Revenu généré par les abonnements Prime." },
+        "Revenus issus des abonnements offerts": { label: "Revenu Subs Offerts ($)", isAverage: false, desc: "Revenu issu des abonnements offerts reçus." },
+        "Revenu des Bits": { label: "Revenu Bits ($)", isAverage: false, desc: "Revenu généré par les cheers et dons de Bits." },
+        "Revenu issu de la publicité": { label: "Revenu Publicité ($)", isAverage: false, desc: "Revenu généré par la diffusion de spots publicitaires." },
+        "Revenus Turbo": { label: "Revenus Turbo ($)", isAverage: false, desc: "Part des revenus versée pour les spectateurs Twitch Turbo." },
+        
+        // --- DÉTAIL DES SUBS & DONS ---
+        "Abonnements Prime": { label: "Volume Subs Prime", isAverage: false, desc: "Nombre de subs Prime activés." },
+        "Abonnements payés au total": { label: "Volume Subs Payés", isAverage: false, desc: "Nombre d'abonnements payés souscrits." },
+        "Abonnement niveau 1": { label: "Subs Payés Niveau 1", isAverage: false, desc: "Nombre de subs payés Tier 1." },
+        "Abonnement niveau 2": { label: "Subs Payés Niveau 2", isAverage: false, desc: "Nombre de subs payés Tier 2." },
+        "Abonnement niveau 3": { label: "Subs Payés Niveau 3", isAverage: false, desc: "Nombre de subs payés Tier 3." },
+        "Abonnements offerts au total": { label: "Volume Subs Offerts", isAverage: false, desc: "Nombre d'abonnements offerts à la communauté." },
+        "Abonnements offerts de niveau 1": { label: "Subs Offerts Niveau 1", isAverage: false, desc: "Nombre de subs offerts Tier 1." },
+        "Total des abonnements de plusieurs mois offerts": { label: "Subs Multi-mois Offerts", isAverage: false, desc: "Abonnements offerts sur plusieurs mois groupés." },
+
+        // --- PUBLICITÉ & EXPOSITION ---
+        "Durée de publicité (en secondes) par heure": { label: "Pub par Heure (Secondes)", isAverage: true, desc: "Secondes de pub diffusées par heure de live." },
+        "Pauses publicité (minutes)": { label: "Temps Total de Pub (Minutes)", isAverage: false, desc: "Volume cumulé de temps publicitaire sur le stream." },
         "_adPerViewer": { label: "Revenu Pub / Unique (m$)", isAverage: true, desc: "Efficacité publicitaire rapportée à l'audience unique.", calc: r => r["Spectateurs uniques"] > 0 ? ((r["Revenu issu de la publicité"]||0) / r["Spectateurs uniques"]) * 1000 : 0 }
     };
 
@@ -444,13 +492,14 @@
         
         window.db = db;
 
-        // Cumul followers & Subs glissants
+        // Cumul followers
         let cumul = 0;
         db.forEach(r => {
             cumul += (r["Nouveaux followers"] || 0);
             r["Cumul followers"] = cumul;
         });
 
+        // Subs actifs glissants 30j
         db.forEach((r, i) => {
             const dateLimite = new Date(r._date.getTime() - (30 * 24 * 3600 * 1000));
             let subsActifs = 0;
@@ -464,7 +513,7 @@
             r["Subs actifs"] = subsActifs;
         });
 
-        // Calcul prédictif des notes globales de chaque stream pour les exploiter en graphiques
+        // Calcul dynamique des notes de stream pré-calculées
         db.forEach(r => {
             if ((r["Minutes passées en stream"] || 0) > 0) {
                 const dnaCalc = computeStreamDNA(r);
@@ -837,7 +886,7 @@
         const key = document.getElementById('metricA').value;
         const groups = {};
 
-        const forceSum = ["Nouveaux followers", "Nouveaux subs", "_revTotal", "Minutes passées en stream", "Vues live", "Messages du chat"];
+        const forceSum = ["Nouveaux followers", "Nouveaux subs", "_revTotal", "Minutes passées en stream", "Vues live", "Messages du chat", "Clips créés", "Visionnements clips"];
         const isSnapshot = (key === "Cumul followers" || key === "Subs actifs");
         const isSum = forceSum.includes(key);
 
@@ -985,11 +1034,11 @@
     }
 
     // =========================================================================
-    // 🧬 STREAM DNA & NOTATION DYNAMIQUE ADAPTATIVE
+    // 🧬 STREAM DNA & NOTATION DYNAMIQUE (CORRECTIONS MATHÉMATIQUES AVANCÉES)
     // =========================================================================
     const DNA_CATEGORIES = {
         community:  { label: "🎯 STREAM COMMUNAUTÉ",  color: "#00ffa3", desc: "Audience ultra-engagée, fidélité au top et chat en ébullition." },
-        viral:      { label: "🚀 STREAM VIRAL",        color: "#ff4f4d", desc: "Pic d'audience puissant et découverte par de nouveaux spectateurs." },
+        viral:      { label: "🚀 STREAM VIRAL",        color: "#ff4f4d", desc: "Pic d'audience puissant, clips et découverte par de nouveaux spectateurs." },
         profitable: { label: "💰 STREAM RENTABLE",     color: "#ffd700", desc: "Excellente efficacité monétaire (subs, bits ou pubs rapportés au temps)." },
         balanced:   { label: "⚖️ STREAM ÉQUILIBRÉ",   color: "#00e5ff", desc: "Performances très saines et homogènes sur tous les piliers de ta chaîne." },
         growth:     { label: "📈 STREAM CROISSANCE",   color: "#9146FF", desc: "Gros afflux et conversion de nouveaux followers." },
@@ -1002,7 +1051,6 @@
         const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 3600 * 1000);
         const sourceData = window.db || [];
         
-        // Échantillon adaptatif des 6 derniers mois (minimum 12 streams récents si historique court)
         let recentStreams = sourceData.filter(s => s._date >= sixMonthsAgo && s._date <= now && (s["Minutes passées en stream"] || 0) > 30);
         if (recentStreams.length < 12) {
             recentStreams = sourceData.filter(s => s._date <= now && (s["Minutes passées en stream"] || 0) > 30).slice(-20);
@@ -1022,36 +1070,83 @@
             }
         }
 
-        const duration = (parseFloat(stream["Minutes passées en stream"]) || 0) / 60;
+        const durationMin = parseFloat(stream["Minutes passées en stream"]) || 0;
+        const durationHours = durationMin / 60;
         const uniqueViewers = parseFloat(stream["Spectateurs uniques"]) || 0;
         const chatMessages = parseFloat(stream["Messages du chat"]) || 0;
+        const chatters = parseFloat(stream["Personnes sur le chat"]) || 0;
         const followers = parseFloat(stream["Nouveaux followers"]) || 0;
         const subs = (parseFloat(stream["Abonnements payés au total"]) || 0) + (parseFloat(stream["Abonnements Prime"]) || 0) + (parseFloat(stream["Abonnements offerts au total"]) || 0);
         const revenue = stream._revTotal || 0;
-        const clips = parseFloat(stream["Visionnements clips"]) || 0;
+        const bitsRev = parseFloat(stream["Revenu des Bits"]) || 0;
+        const clipsViews = parseFloat(stream["Visionnements clips"]) || 0;
+        const clipsCreated = parseFloat(stream["Clips créés"]) || 0;
         const liveViews = parseFloat(stream["Vues live"]) || 0;
+        const raidPct = parseFloat(stream["Spectateurs d'hébergements et de raids (%)"]) || 0;
         const minutesWatched = parseFloat(stream["Minutes regardées"]) || 0;
 
-        const retentionRaw = (uniqueViewers > 0 && duration > 0) ? (minutesWatched / uniqueViewers) / (duration * 60) : 0;
-        const chatRaw = uniqueViewers > 0 ? chatMessages / uniqueViewers : 0;
-        const growthRaw = followers * 4 + subs;
-        const viralityRaw = clips + liveViews * 0.5;
-        const reachRaw = uniqueViewers;
-        const subConvRaw = uniqueViewers > 0 ? subs / uniqueViewers : 0;
-        const monoRaw = duration > 0 ? revenue / duration : 0;
+        // 1. Rétention hybride : pondère durée absolue en min/unique et stickiness relative (% du live)
+        const retAbs = uniqueViewers > 0 ? minutesWatched / uniqueViewers : 0;
+        const retRel = (uniqueViewers > 0 && durationMin > 0) ? retAbs / durationMin : 0;
+        const retentionRaw = Math.sqrt(retAbs * Math.min(Math.max(retRel, 0.01), 1.0) * 100);
 
+        // 2. Chat : moyenne géométrique (messages / unique × messages / chatter)
+        const chatPerUnique = uniqueViewers > 0 ? chatMessages / uniqueViewers : 0;
+        const chatPerChatter = chatters > 0 ? chatMessages / chatters : 0;
+        const chatRaw = Math.sqrt(chatPerUnique * chatPerChatter);
+
+        // 3. Croissance : followers et subs pondérés
+        const growthRaw = followers * 3.5 + subs * 1.5;
+
+        // 4. Viralité : Clips valorisés à leur juste échelle face aux clics et raids
+        const viralityRaw = (clipsViews * 15) + (clipsCreated * 20) + (liveViews * 0.4) + (raidPct * 8);
+
+        // 5. Portée : audience unique
+        const reachRaw = uniqueViewers;
+
+        // 6. Conversion subs & soutien financier : Subs + équivalence bits
+        const subConvRaw = uniqueViewers > 0 ? (subs + (bitsRev / 2.5)) / uniqueViewers : 0;
+
+        // 7. Monétisation horaire
+        const monoRaw = durationHours > 0 ? revenue / durationHours : 0;
+
+        // Référentiels des 6 derniers mois
         const ref = {
             retention: recentStreams.map(s => {
-                const d = (s["Minutes passées en stream"] || 0) / 60;
-                const u = s["Spectateurs uniques"] || 0;
-                return (u > 0 && d > 0) ? ((s["Minutes regardées"] || 0) / u) / (d * 60) : 0;
+                const u = parseFloat(s["Spectateurs uniques"]) || 0;
+                const dMin = parseFloat(s["Minutes passées en stream"]) || 0;
+                const mw = parseFloat(s["Minutes regardées"]) || 0;
+                const rA = u > 0 ? mw / u : 0;
+                const rR = (u > 0 && dMin > 0) ? rA / dMin : 0;
+                return Math.sqrt(rA * Math.min(Math.max(rR, 0.01), 1.0) * 100);
             }),
-            chat: recentStreams.map(s => (s["Spectateurs uniques"] || 0) > 0 ? (s["Messages du chat"] || 0) / s["Spectateurs uniques"] : 0),
-            growth: recentStreams.map(s => (s["Nouveaux followers"] || 0) * 4 + (s["Nouveaux subs"] || 0)),
-            virality: recentStreams.map(s => (s["Visionnements clips"] || 0) + (s["Vues live"] || 0) * 0.5),
-            reach: recentStreams.map(s => s["Spectateurs uniques"] || 0),
-            subConv: recentStreams.map(s => (s["Spectateurs uniques"] || 0) > 0 ? (s["Nouveaux subs"] || 0) / s["Spectateurs uniques"] : 0),
-            mono: recentStreams.map(s => (s["Minutes passées en stream"] || 0) > 0 ? (s._revTotal || 0) / (s["Minutes passées en stream"] / 60) : 0)
+            chat: recentStreams.map(s => {
+                const u = parseFloat(s["Spectateurs uniques"]) || 0;
+                const ch = parseFloat(s["Personnes sur le chat"]) || 0;
+                const m = parseFloat(s["Messages du chat"]) || 0;
+                const cU = u > 0 ? m / u : 0;
+                const cC = ch > 0 ? m / ch : 0;
+                return Math.sqrt(cU * cC);
+            }),
+            growth: recentStreams.map(s => (parseFloat(s["Nouveaux followers"])||0)*3.5 + (parseFloat(s["Nouveaux subs"])||0)*1.5),
+            virality: recentStreams.map(s => {
+                const cv = parseFloat(s["Visionnements clips"]) || 0;
+                const cc = parseFloat(s["Clips créés"]) || 0;
+                const lv = parseFloat(s["Vues live"]) || 0;
+                const rp = parseFloat(s["Spectateurs d'hébergements et de raids (%)"]) || 0;
+                return (cv * 15) + (cc * 20) + (lv * 0.4) + (rp * 8);
+            }),
+            reach: recentStreams.map(s => parseFloat(s["Spectateurs uniques"]) || 0),
+            subConv: recentStreams.map(s => {
+                const u = parseFloat(s["Spectateurs uniques"]) || 0;
+                const sb = parseFloat(s["Nouveaux subs"]) || 0;
+                const bt = parseFloat(s["Revenu des Bits"]) || 0;
+                return u > 0 ? (sb + (bt / 2.5)) / u : 0;
+            }),
+            mono: recentStreams.map(s => {
+                const dH = (parseFloat(s["Minutes passées en stream"]) || 0) / 60;
+                return dH > 0 ? (s._revTotal || 0) / dH : 0;
+            })
         };
 
         const dnaScores = {
@@ -1110,13 +1205,13 @@
         const cat = DNA_CATEGORIES[category];
 
         const axes = [
-            { key: 'retention', label: 'Rétention', icon: '⏱', color: '#00e5ff', desc: 'Capacité à maintenir le spectateur longtemps sur le live.' },
-            { key: 'chatActivity', label: 'Chat', icon: '💬', color: '#9146FF', desc: 'Volume de messages rapporté aux spectateurs connectés.' },
-            { key: 'subConversion', label: 'Conv. Subs', icon: '⭐', color: '#ffd700', desc: 'Transformation en subs payés ou Prime.' },
-            { key: 'virality', label: 'Viralité', icon: '🚀', color: '#ff4f4d', desc: 'Clips visionnés et nouvelles opportunités de reach.' },
-            { key: 'monetization', label: 'Monétisation', icon: '💰', color: '#00ffa3', desc: 'Revenu horaire généré sur la session.' },
-            { key: 'growth', label: 'Croissance', icon: '📈', color: '#a78bfa', desc: 'Rythme d\'acquisition de followers.' },
-            { key: 'reach', label: 'Portée', icon: '📡', color: '#38bdf8', desc: 'Volume de spectateurs uniques sur le live.' }
+            { key: 'retention', label: 'Rétention', icon: '⏱', color: '#00e5ff', desc: 'Maintien équilibré de l\'attention en minutes et en part de live.' },
+            { key: 'chatActivity', label: 'Chat', icon: '💬', color: '#9146FF', desc: 'Volume global par visiteur et intensité par participant actif.' },
+            { key: 'subConversion', label: 'Conv. Subs', icon: '⭐', color: '#ffd700', desc: 'Transformation en abonnements payés, offerts, Prime et Bits.' },
+            { key: 'virality', label: 'Viralité', icon: '🚀', color: '#ff4f4d', desc: 'Poids réel des clips créés/vus, du trafic entrant et des raids.' },
+            { key: 'monetization', label: 'Monétisation', icon: '💰', color: '#00ffa3', desc: 'Revenu horaire global généré par session.' },
+            { key: 'growth', label: 'Croissance', icon: '📈', color: '#a78bfa', desc: 'Rythme d\'acquisition de nouveaux followers et subs.' },
+            { key: 'reach', label: 'Portée', icon: '📡', color: '#38bdf8', desc: 'Volume brut de spectateurs uniques sur le live.' }
         ];
 
         const vals = axes.map(a => dna[a.key] ?? 50);
@@ -1279,7 +1374,7 @@
     }
 
     // =========================================================================
-    // 🧠 AUDIT STRATÉGIQUE COMPLET AVEC GEMINI
+    // 🧠 AUDIT STRATÉGIQUE COMPLET AVEC GEMINI (FLUX COMPLET DU CSV)
     // =========================================================================
     async function callGeminiAI() {
         const btn = document.getElementById('geminiBtn');
@@ -1301,7 +1396,7 @@
         try {
             const streams = db.filter(d => (d["Minutes passées en stream"] || 0) > 0);
             
-            // 1. Métriques par période glissante
+            // 1. Métriques consolidées par période glissante
             const getMetricsPeriod = (days) => {
                 const end = db[db.length - 1]._date;
                 const start = new Date(end.getTime() - (days * 24 * 3600 * 1000));
@@ -1313,11 +1408,12 @@
                 const totalFollows = slice.reduce((a, b) => a + (b["Nouveaux followers"] || 0), 0);
                 const totalSubs = slice.reduce((a, b) => a + (b["Nouveaux subs"] || 0), 0);
                 const totalRev = slice.reduce((a, b) => a + (b._revTotal || 0), 0).toFixed(1);
+                const totalMsgs = slice.reduce((a, b) => a + (b["Messages du chat"] || 0), 0);
                 const avgDuration = (slice.reduce((a, b) => a + (b["Minutes passées en stream"] || 0), 0) / (count * 60)).toFixed(1);
                 const avgRet = (slice.reduce((a, b) => a + (b._stickiness || 0), 0) / count).toFixed(1);
                 const avgLoyalty = (slice.reduce((a, b) => a + (b._loyaltyRate || 0), 0) / count).toFixed(1);
                 const avgScore = (slice.reduce((a, b) => a + (b._streamScore || 0), 0) / count).toFixed(0);
-                return `${count} lives (${avgDuration}h moy.) | Score moy: ${avgScore}/100 | Viewers moy: ${avgV} (Pic: ${avgMaxV}) | Rétention moy: ${avgRet}min | Fidélité habitués: ${avgLoyalty}% | Follows: +${totalFollows} | Subs: +${totalSubs} | CA: ${totalRev}$`;
+                return `${count} lives (${avgDuration}h moy.) | Score: ${avgScore}/100 | Viewers moy: ${avgV} (Pic: ${avgMaxV}) | Rétention moy: ${avgRet}min | Fidélité habitués: ${avgLoyalty}% | Follows: +${totalFollows} | Subs: +${totalSubs} | Chat: ${totalMsgs} msgs | CA: ${totalRev}$`;
             };
 
             // 2. Performance par jour de la semaine
@@ -1340,13 +1436,13 @@
             // 3. Top 3 vs Flop 3 récents pour analyse comparative
             const sortedByScore = [...streams].slice(-40).sort((a, b) => (b._streamScore || 0) - (a._streamScore || 0));
             const topStreams = sortedByScore.slice(0, 3).map(s => 
-                `[${s._date.toLocaleDateString('fr-FR')}] Score: ${s._streamScore}/100, ${((s["Minutes passées en stream"]||0)/60).toFixed(1)}h, ${Math.round(s["Spectateurs en moyenne"]||0)}v (Max ${Math.round(s["Spectateurs max."]||0)}), Chat: ${s["Messages du chat"]||0} msgs, Follows: +${s["Nouveaux followers"]||0}, Fidélité: ${(s._loyaltyRate||0).toFixed(0)}%`
+                `[${s._date.toLocaleDateString('fr-FR')}] Score: ${s._streamScore}/100, ${((s["Minutes passées en stream"]||0)/60).toFixed(1)}h, ${Math.round(s["Spectateurs en moyenne"]||0)}v (Max ${Math.round(s["Spectateurs max."]||0)}), Chat: ${s["Messages du chat"]||0} msgs (${s["Personnes sur le chat"]||0} chatters), Follows: +${s["Nouveaux followers"]||0}, Fidélité: ${(s._loyaltyRate||0).toFixed(0)}%`
             ).join("\n");
             const bottomStreams = sortedByScore.slice(-3).map(s => 
-                `[${s._date.toLocaleDateString('fr-FR')}] Score: ${s._streamScore}/100, ${((s["Minutes passées en stream"]||0)/60).toFixed(1)}h, ${Math.round(s["Spectateurs en moyenne"]||0)}v (Max ${Math.round(s["Spectateurs max."]||0)}), Chat: ${s["Messages du chat"]||0} msgs, Follows: +${s["Nouveaux followers"]||0}, Fidélité: ${(s._loyaltyRate||0).toFixed(0)}%`
+                `[${s._date.toLocaleDateString('fr-FR')}] Score: ${s._streamScore}/100, ${((s["Minutes passées en stream"]||0)/60).toFixed(1)}h, ${Math.round(s["Spectateurs en moyenne"]||0)}v (Max ${Math.round(s["Spectateurs max."]||0)}), Chat: ${s["Messages du chat"]||0} msgs (${s["Personnes sur le chat"]||0} chatters), Follows: +${s["Nouveaux followers"]||0}, Fidélité: ${(s._loyaltyRate||0).toFixed(0)}%`
             ).join("\n");
 
-            // 4. Chronologie des 15 derniers lives
+            // 4. Chronologie détaillée des 15 derniers lives
             const last15StreamsSummary = streams.slice(-15).map(s => {
                 const dStr = s._date.toLocaleDateString('fr-FR');
                 const score = s._streamScore || 50;
@@ -1364,7 +1460,7 @@
                 const raid = (s["Spectateurs d'hébergements et de raids (%)"] || 0).toFixed(0);
                 const adSec = s["Durée de publicité (en secondes) par heure"] || 0;
 
-                return `• [${dStr}] Score: ${score}/100 | Durée: ${dur}h | Moy: ${v}v (Pic: ${max}) | Uniques: ${uniq} | Ret: ${ret}min | Chat: ${chatMsgs} msgs (${chatters} chatters) | Follows: +${fol} | Subs: +${subs} | Fidélité: ${loy}% | Raids: ${raid}% | Pubs: ${adSec}s/h | CA: ${rev}$`;
+                return `• [${dStr}] Score: ${score}/100 | Durée: ${dur}h | Moy: ${v}v (Pic: ${max}) | Uniques: ${uniq} | Rétention: ${ret}min | Chat: ${chatMsgs} msgs (${chatters} chatters) | Follows: +${fol} | Subs: +${subs} | Fidélité: ${loy}% | Raids: ${raid}% | Pubs: ${adSec}s/h | CA: ${rev}$`;
             }).join("\n");
 
             const promptText = `
