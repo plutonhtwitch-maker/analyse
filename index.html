@@ -676,7 +676,7 @@
                     <span class="kpi-title">${METRICS_DICT[k].label}</span>
                     <div class="kpi-value">${display}</div>
                     <div style="color:${delta>=0?'var(--accent-green)':'var(--accent-red)'}; font-size:0.75rem; font-weight:bold; margin-top:5px;">
-                        ${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta).toFixed(1)}%
+                        ${delta >= 0 ? '▲' : '▼'}${Math.abs(delta).toFixed(1)}%
                     </div>
                 `;
             }
@@ -1026,7 +1026,7 @@
                     <div style="display:flex; align-items:center; gap:12px; margin-bottom:11px; font-size:0.75rem;">
                         <span style="width:160px; color:var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${METRICS_DICT[k].label}</span>
                         <div style="flex:1; height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
-                            <div style="width:${Math.abs(val)*100}%; height:100%; background:${color}; box-shadow: 0 0 8px ${color}44;"></div>
+                            <div style="width:${Math.abs(val)*100}%; height:100%; background:${color}; box-shadow: 0 0 8px${color}44;"></div>
                         </div>
                         <span style="color:${color}; font-weight:bold; width:38px; text-align:right;">${val.toFixed(2)}</span>
                     </div>`;
@@ -1183,7 +1183,7 @@
     }
 
     // =========================================================================
-    // 🧠 ANALYSE IA DU STREAM SÉLECTIONNÉ (POINTS FORTS / FAIBLES CONTEXTUALISÉS)
+    // 🧠 ANALYSE IA DU STREAM SÉLECTIONNÉ (ROBUSTE AUX VALEURS EXTRÊMES / MÉDIANES)
     // =========================================================================
     async function callGeminiStreamAudit() {
         if (!currentStreamList.length) return;
@@ -1202,71 +1202,99 @@
             btn.innerText = "ANALYSE EN COURS...";
         }
         if (container) {
-            container.innerHTML = "<span style='color:var(--text-dim); font-style:italic;'>Interrogation de Gemini avec benchmark 6M...</span>";
+            container.innerHTML = "<span style='color:var(--text-dim); font-style:italic;'>Calcul du benchmark avancé (moyennes, médianes et quartiles) et synthèse Gemini...</span>";
         }
 
         try {
             const streamMinutes = parseFloat(s["Minutes passées en stream"]) || 0;
-            const streamHours = (streamMinutes / 60).toFixed(1);
+            const streamHours = streamMinutes / 60;
             const avgV = parseFloat(s["Spectateurs en moyenne"]) || 0;
             const maxV = parseFloat(s["Spectateurs max."]) || 0;
             const uniques = parseFloat(s["Spectateurs uniques"]) || 0;
+            const liveViews = parseFloat(s["Vues live"]) || 0;
+            const engaged = parseFloat(s["Viewers impliqués"]) || 0;
             const msgs = parseFloat(s["Messages du chat"]) || 0;
             const chatters = parseFloat(s["Personnes sur le chat"]) || 0;
             const follows = parseFloat(s["Nouveaux followers"]) || 0;
-            const subs = (parseFloat(s["Abonnements payés au total"]) || 0) + (parseFloat(s["Abonnements Prime"]) || 0) + (parseFloat(streamAiCache[dateKey]?.subs || s["Abonnements offerts au total"]) || 0);
+            const paidSubs = parseFloat(s["Abonnements payés au total"]) || 0;
+            const primeSubs = parseFloat(s["Abonnements Prime"]) || 0;
+            const giftSubs = parseFloat(s["Abonnements offerts au total"]) || 0;
+            const totalSubs = paidSubs + primeSubs + giftSubs;
             const rev = s._revTotal || 0;
-            const ret = uniques > 0 ? ((parseFloat(s["Minutes regardées"])||0) / uniques).toFixed(1) : "0";
-            const loyalty = (s._loyaltyRate || 0).toFixed(0);
-            const raids = (parseFloat(s["Spectateurs d'hébergements et de raids (%)"])||0).toFixed(1);
+            const revAd = parseFloat(s["Revenu issu de la publicité"]) || 0;
+            const revDirect = rev - revAd;
+            const hourlyRev = streamHours > 0 ? (rev / streamHours) : 0;
+            const ret = uniques > 0 ? ((parseFloat(s["Minutes regardées"])||0) / uniques) : 0;
+            const retRel = (uniques > 0 && streamMinutes > 0) ? (ret / streamMinutes) * 100 : 0;
+            const loyalty = s._loyaltyRate || 0;
+            const raids = parseFloat(s["Spectateurs d'hébergements et de raids (%)"])||0;
             const adSec = parseFloat(s["Durée de publicité (en secondes) par heure"])||0;
+            const msgsPerChatter = chatters > 0 ? (msgs / chatters) : 0;
+            const chatParticipationRate = uniques > 0 ? (chatters / uniques) * 100 : 0;
+            const followConvRate = uniques > 0 ? (follows / uniques) * 100 : 0;
 
-            // Benchmark des streams des 6 derniers mois
+            // Stream précédent direct
+            const prevS = currentStreamIndex > 0 ? currentStreamList[currentStreamIndex - 1] : null;
+
+            // Benchmark 6 mois avec Médianes & Quartiles
             const sixMonthsAgo = new Date(s._date.getTime() - 180 * 24 * 3600 * 1000);
             const refStreams = (window.db || []).filter(item => item._date >= sixMonthsAgo && item._date <= s._date && (item["Minutes passées en stream"] || 0) > 30);
-            const refCount = refStreams.length || 1;
-            const benchmark = {
-                avgViewers: (refStreams.reduce((a,b)=>a+(b["Spectateurs en moyenne"]||0),0)/refCount).toFixed(1),
-                maxViewers: (refStreams.reduce((a,b)=>a+(b["Spectateurs max."]||0),0)/refCount).toFixed(1),
-                uniques: (refStreams.reduce((a,b)=>a+(b["Spectateurs uniques"]||0),0)/refCount).toFixed(1),
-                retention: (refStreams.reduce((a,b)=>a+(b._stickiness||0),0)/refCount).toFixed(1),
-                loyalty: (refStreams.reduce((a,b)=>a+(b._loyaltyRate||0),0)/refCount).toFixed(0),
-                chatPerUnique: (refStreams.reduce((a,b)=>a+(b._chatMessagesPerUnique||0),0)/refCount).toFixed(2),
-                follows: (refStreams.reduce((a,b)=>a+(b["Nouveaux followers"]||0),0)/refCount).toFixed(1),
-                revPerHour: (refStreams.reduce((a,b)=>a+(b._hourlyEarnings||0),0)/refCount).toFixed(2)
+            const count = refStreams.length || 1;
+
+            const getStats = (extractor) => {
+                const arr = refStreams.map(extractor).filter(v => typeof v === 'number' && !isNaN(v)).sort((a,b) => a - b);
+                if (!arr.length) return { mean: 0, median: 0, p25: 0, p75: 0 };
+                const mean = arr.reduce((a,b)=>a+b,0) / arr.length;
+                const mid = Math.floor(arr.length / 2);
+                const median = arr.length % 2 !== 0 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+                const p25 = arr[Math.floor(arr.length * 0.25)];
+                const p75 = arr[Math.floor(arr.length * 0.75)];
+                return { mean, median, p25, p75 };
             };
 
+            const statsV = getStats(item => parseFloat(item["Spectateurs en moyenne"]) || 0);
+            const statsMaxV = getStats(item => parseFloat(item["Spectateurs max."]) || 0);
+            const statsUniques = getStats(item => parseFloat(item["Spectateurs uniques"]) || 0);
+            const statsRet = getStats(item => item._stickiness || 0);
+            const statsLoyalty = getStats(item => item._loyaltyRate || 0);
+            const statsFollows = getStats(item => parseFloat(item["Nouveaux followers"]) || 0);
+            const statsHourlyRev = getStats(item => item._hourlyEarnings || 0);
+            const statsChatUnique = getStats(item => item._chatMessagesPerUnique || 0);
+
             const prompt = `
-Tu es l'analyste de stream Twitch de Plutonh. Analyse le stream suivant en le confrontant rigoureusement à ses moyennes habituelles (sur 6 mois) :
+Tu es l'analyste stratégique Twitch de Plutonh. Analyse cette session de stream avec précision.
 
-LIVE SÉLECTIONNÉ (${s._date.toLocaleDateString('fr-FR')}) :
-- Note globale estimée : ${s._streamScore || 50}/100
-- Durée : ${streamHours}h
-- Viewers moyens : ${avgV.toFixed(1)} (Pic max : ${maxV})
-- Viewers uniques : ${uniques}
-- Rétention moyenne : ${ret} min/viewer
-- Taux de fidélité habitués : ${loyalty}%
-- Activité chat : ${msgs} msgs postés par ${chatters} chatters distincts (${uniques > 0 ? (msgs/uniques).toFixed(2) : 0} msgs/unique)
-- Nouveaux followers : +${follows}
-- Subs gagnés : +${subs}
-- Raids & hosts reçus : ${raids}%
-- Revenus totaux : ${rev.toFixed(2)}$
-- Publicité diffusée : ${adSec}s/h
+IMPORTANT POUR LA MONÉTISATION ET LES STATS :
+Ne te fais PAS piéger par les moyennes arithmétiques de revenus qui sont ponctuellement faussées par de rares sessions exceptionnelles (gros trains de la hype ou vagues de subs offerts).
+Compare les revenus horaires en priorité à la MÉDIANE HABITUELLE et à la FOURCHETTE NORMALE (P25 - P75) pour juger si la session est réellement faible, standard ou forte.
 
-MOYENNES HABITUELLES (SUR LES 6 DERNIERS MOIS) :
-- Viewers moyens : ${benchmark.avgViewers} | Pic : ${benchmark.maxViewers}
-- Viewers uniques : ${benchmark.uniques}
-- Rétention : ${benchmark.retention} min/viewer
-- Fidélité habitués : ${benchmark.loyalty}%
-- Volume chat par unique : ${benchmark.chatPerUnique} msgs/unique
-- Followers par stream : +${benchmark.follows}
-- Revenus horaires : ${benchmark.revPerHour}$/h
+DONNÉES DU STREAM DU ${s._date.toLocaleDateString('fr-FR')} :
+- Score global : ${s._streamScore || 50}/100
+- Durée : ${streamHours.toFixed(1)}h
+- Viewers : ${avgV.toFixed(1)} moy. (Pic max :${maxV})
+- Viewers uniques : ${uniques} (Clics bruts :${liveViews})
+- Rétention : ${ret.toFixed(1)} min/viewer (${retRel.toFixed(1)}% du stream regardé en moy.)
+- Engagement & Fidélité : ${loyalty.toFixed(0)}% d'anciens habitués (${engaged} viewers impliqués)
+- Chat : ${msgs} messages par${chatters} chatters (${msgsPerChatter.toFixed(1)} msgs/chatter actif,${chatParticipationRate.toFixed(1)}% des uniques ont écrit)
+- Croissance : +${follows} followers (${followConvRate.toFixed(1)}% de conversion) | +${totalSubs} subs (Détail: ${paidSubs} payés, ${primeSubs} Prime,${giftSubs} offerts)
+- Monétisation : ${rev.toFixed(2)}$ total (${hourlyRev.toFixed(2)}$/h) | Dont direct communauté : ${revDirect.toFixed(2)}$ | Dont pub passive : ${revAd.toFixed(2)}$
+- Publicité & Entrées : ${adSec}s/h de pub | ${raids.toFixed(1)}\% d'audience issue de raids${prevS ? `- Contexte stream précédent (${prevS._date.toLocaleDateString('fr-FR')}) : ${prevS["Spectateurs en moyenne"]||0} viewers moy, ${((prevS["Minutes passées en stream"]||0)/60).toFixed(1)}h, ${prevS._revTotal||0}$ CA.` : ''}
 
-CONSIGNE : Réponds STRICTEMENT et UNIQUEMENT avec ce format HTML compact (aucun markdown, aucune balise code, que ce HTML) :
-<div style="color:#f0f0f8; font-size:0.78rem; line-height:1.4; margin-bottom:6px;"><strong>Synthèse :</strong> [1 phrase percutante résumant la dynamique du live par rapport aux habitudes]</div>
-<div style="font-size:0.74rem; color:#d8d8e5; line-height:1.35; margin-bottom:4px;"><strong style="color:var(--accent-green);">▲ FORCES :</strong> [2 ou 3 points forts précis avec chiffres et ratios marquants séparés par •]</div>
-<div style="font-size:0.74rem; color:#d8d8e5; line-height:1.35; margin-bottom:4px;"><strong style="color:var(--accent-red);">▼ LIMITES :</strong> [2 ou 3 axes d'amélioration ou freins observés séparés par •]</div>
-<div style="font-size:0.73rem; color:var(--accent-cyan); font-style:italic;">💡 <strong>Conseil :</strong> [1 action concrète à appliquer pour les prochains lives]</div>
+NORMES HABITUELLES SUR 6 MOIS (${count} STREAMS ANALYSÉS) :
+- Revenu / heure : Médiane = ${statsHourlyRev.median.toFixed(2)}$/h | Fourchette habituelle normale (P25-P75) = [${statsHourlyRev.p25.toFixed(2)}$/h à ${statsHourlyRev.p75.toFixed(2)}$/h] | (Moyenne arithmétique brute = ${statsHourlyRev.mean.toFixed(2)}$/h, gonflée par quelques outliers)
+- Viewers moyens : Médiane = ${statsV.median.toFixed(1)} \vert{} Moyenne =${statsV.mean.toFixed(1)} (Pics médians: ${statsMaxV.median.toFixed(1)})
+- Viewers uniques : Médiane = ${statsUniques.median.toFixed(0)} \vert{} Moyenne =${statsUniques.mean.toFixed(0)}
+- Rétention : Médiane = ${statsRet.median.toFixed(1)} min \vert{} Moyenne =${statsRet.mean.toFixed(1)} min
+- Fidélité habitués : Médiane = ${statsLoyalty.median.toFixed(0)}\% \vert{} Moyenne =${statsLoyalty.mean.toFixed(0)}%
+- Nouveaux followers / stream : Médiane = +${statsFollows.median.toFixed(1)} \vert{} Moyenne = +${statsFollows.mean.toFixed(1)}
+- Volume chat par unique : Médiane = ${statsChatUnique.median.toFixed(2)} msgs/unique \vert{} Moyenne =${statsChatUnique.mean.toFixed(2)}
+
+RÈGLES DE RESTITUTION :
+Réponds STRICTEMENT sous ce format HTML direct (aucun markdown, aucune balise \`\`\`html, rien d'autre) :
+<div style="color:#f0f0f8; font-size:0.78rem; line-height:1.4; margin-bottom:6px;"><strong>Synthèse :</strong> [1 phrase percutante et équilibrée situant la dynamique du live par rapport aux standards réels]</div>
+<div style="font-size:0.74rem; color:#d8d8e5; line-height:1.35; margin-bottom:4px;"><strong style="color:var(--accent-green);">▲ FORCES :</strong> [2 ou 3 points forts avec ratios/chiffres précis comparés aux médianes/standards habituels séparés par •]</div>
+<div style="font-size:0.74rem; color:#d8d8e5; line-height:1.35; margin-bottom:4px;"><strong style="color:var(--accent-red);">▼ LIMITES :</strong> [2 ou 3 points faibles ou leviers sous-exploités pertinents séparés par •]</div>
+<div style="font-size:0.73rem; color:var(--accent-cyan); font-style:italic;">💡 <strong>Conseil :</strong> [1 conseil tactique concret et activable pour le prochain live]</div>
             `;
 
             const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
