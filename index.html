@@ -92,6 +92,25 @@
         .ai-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .ai-btn:not(:disabled):hover { box-shadow: 0 0 15px rgba(0, 229, 255, 0.6); }
 
+        .dna-ai-btn {
+            background: rgba(0, 229, 255, 0.12);
+            border: 1px solid var(--accent-blue);
+            color: var(--accent-blue);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.25s;
+        }
+        .dna-ai-btn:hover:not(:disabled) {
+            background: var(--accent-blue);
+            color: #000;
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
+        }
+        .dna-ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
         #aiInsights h3 { color: var(--accent-green); font-family: 'Orbitron'; font-size: 0.95rem; margin: 14px 0 6px; border-bottom: 1px solid rgba(0,255,163,0.15); padding-bottom: 4px; }
         #aiInsights h4 { color: var(--accent-blue); font-size: 0.85rem; margin: 10px 0 4px; font-family: 'Orbitron'; }
         #aiInsights ul { padding-left: 20px; margin-bottom: 10px; }
@@ -351,6 +370,7 @@
     let charts = {};
     let currentStreamList = [];
     let currentStreamIndex = 0;
+    let streamAiCache = {};
 
     let crossPos = { x: null, y: null, targetX: null, targetY: null };
 
@@ -1016,7 +1036,7 @@
     }
 
     // =========================================================================
-    // 🧬 STREAM DNA & NOTATION DYNAMIQUE + ANALYSE MODULAIRE CONTEXTUELLE
+    // 🧬 STREAM DNA & NOTATION DYNAMIQUE
     // =========================================================================
     const DNA_CATEGORIES = {
         community:  { label: "STREAM COMMUNAUTÉ",  color: "#00ffa3", icon: "🎯" },
@@ -1163,127 +1183,124 @@
     }
 
     // =========================================================================
-    // 🔍 MOTEUR D'ANALYSE DYNAMIQUE : FORCES, FAIBLESSES ET RECOMMANDATIONS
+    // 🧠 ANALYSE IA DU STREAM SÉLECTIONNÉ (POINTS FORTS / FAIBLES CONTEXTUALISÉS)
     // =========================================================================
-    function generateStreamNarrative(stream, dnaData) {
-        if (!stream || !dnaData) return { summary: "", strengths: [], weaknesses: [], advice: "" };
-        const dna = dnaData.axes;
-        const globalScore = dnaData.globalScore;
+    async function callGeminiStreamAudit() {
+        if (!currentStreamList.length) return;
+        const s = currentStreamList[currentStreamIndex];
+        const dateKey = s.Date || s._date.toISOString().slice(0,10);
+        const btn = document.getElementById('btnStreamAi');
+        const container = document.getElementById('streamAiContent');
 
-        const durMin = parseFloat(stream["Minutes passées en stream"]) || 0;
-        const durHours = durMin / 60;
-        const uniques = parseFloat(stream["Spectateurs uniques"]) || 0;
-        const avgV = parseFloat(stream["Spectateurs en moyenne"]) || 0;
-        const maxV = parseFloat(stream["Spectateurs max."]) || 0;
-        const follows = parseFloat(stream["Nouveaux followers"]) || 0;
-        const subs = (parseFloat(stream["Abonnements payés au total"]) || 0) + (parseFloat(stream["Abonnements Prime"]) || 0) + (parseFloat(stream["Abonnements offerts au total"]) || 0);
-        const msgs = parseFloat(stream["Messages du chat"]) || 0;
-        const chatters = parseFloat(stream["Personnes sur le chat"]) || 0;
-        const minutesWatched = parseFloat(stream["Minutes regardées"]) || 0;
-        const adSec = parseFloat(stream["Durée de publicité (en secondes) par heure"]) || 0;
-        const raidPct = parseFloat(stream["Spectateurs d'hébergements et de raids (%)"]) || 0;
-        const loyaltyRate = stream._loyaltyRate || 0;
-
-        const retMin = uniques > 0 ? (minutesWatched / uniques) : 0;
-        const msgsPerChatter = chatters > 0 ? (msgs / chatters) : 0;
-        const chatParticipationPct = uniques > 0 ? (chatters / uniques) * 100 : 0;
-        const convFollowPct = uniques > 0 ? (follows / uniques) * 100 : 0;
-        const peakRatio = avgV > 0 ? (maxV / avgV) : 1;
-
-        let summary = "";
-        let strengths = [];
-        let weaknesses = [];
-        let advice = "";
-
-        // 1. Synthèse globale croisée
-        if (dna.retention >= 70 && dna.reach < 45) {
-            summary = "Noyau dur très captivé qui a tenu tout le stream, mais diffusion globale restreinte par un manque d'afflux extérieur.";
-        } else if (dna.reach >= 70 && dna.retention < 45) {
-            summary = "Excellente visibilité et passage élevé sur la chaîne, mais perte d'audience rapide faute de rétention.";
-        } else if (dna.chatActivity >= 70 && dna.retention >= 65) {
-            summary = "Session très soudée : le chat a maintenu un rythme soutenu et une fidélité exemplaire sur toute la durée.";
-        } else if (dna.virality >= 70 || raidPct > 18) {
-            summary = "Boost d'audience externe remarquable (raid ou viralité clips) qui a dynamisé les statistiques du live.";
-        } else if (globalScore >= 75) {
-            summary = "Session exemplaire : synergie optimale entre engagement du chat, présence continue et acquisition.";
-        } else if (globalScore <= 35) {
-            summary = "Live en demi-teinte sur la quasi-totalité des métriques clés par rapport à tes performances habituelles.";
-        } else {
-            summary = "Performance régulière et équilibrée, fidèle aux standards de croisière de la chaîne.";
+        if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("remplace ton api key")) {
+            if (container) container.innerHTML = "<span style='color:var(--accent-red)'>Clé API GEMINI non configurée.</span>";
+            return;
         }
 
-        // 2. Points forts modulaires
-        if (retMin >= 22 || dna.retention >= 75) {
-            strengths.push(`Rétention élevée (<strong>${retMin.toFixed(1)} min/viewer</strong>)`);
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = "ANALYSE EN COURS...";
         }
-        if (msgsPerChatter >= 20 || (dna.chatActivity >= 72 && msgs > 100)) {
-            strengths.push(`Chat très investi (<strong>${msgsPerChatter.toFixed(1)} msgs/chatter</strong>)`);
-        } else if (chatParticipationPct >= 30) {
-            strengths.push(`Forte participation au chat (<strong>${chatParticipationPct.toFixed(0)}%</strong> des viewers)`);
-        }
-        if (convFollowPct >= 3.5 || follows >= 5) {
-            strengths.push(`Transformation follow efficace (<strong>+${follows}</strong> follows, <strong>${convFollowPct.toFixed(1)}%</strong>)`);
-        }
-        if (subs >= 2) {
-            strengths.push(`Soutien financier solide (<strong>+${subs} subs</strong>)`);
-        }
-        if (peakRatio >= 1.6 && maxV >= 10) {
-            strengths.push(`Pic d'attention marqué (<strong>${Math.round(maxV)} max</strong> vs <strong>${Math.round(avgV)} moy.</strong>)`);
-        }
-        if (loyaltyRate >= 65) {
-            strengths.push(`Fidélité au rendez-vous (<strong>${loyaltyRate.toFixed(0)}%</strong> d'anciens viewers)`);
-        }
-        if (raidPct >= 15) {
-            strengths.push(`Synergie réseau (<strong>${raidPct.toFixed(0)}%</strong> de l'audience issue de raids)`);
-        }
-        if (strengths.length === 0) {
-            strengths.push("Rythme de diffusion stable et sans décrochage brutal");
+        if (container) {
+            container.innerHTML = "<span style='color:var(--text-dim); font-style:italic;'>Interrogation de Gemini avec benchmark 6M...</span>";
         }
 
-        // 3. Points faibles modulaires
-        if (dna.retention <= 35 || retMin < 10) {
-            weaknesses.push(`Rétention basse (<strong>${retMin.toFixed(1)} min</strong> par visiteur)`);
-        }
-        if (chatParticipationPct < 14 && uniques >= 25) {
-            weaknesses.push(`Chat silencieux (seulement <strong>${chatParticipationPct.toFixed(0)}%</strong> de chatters actifs)`);
-        }
-        if (follows === 0 && uniques >= 30) {
-            weaknesses.push(`Conversion follow nulle malgré <strong>${uniques}</strong> spectateurs uniques`);
-        }
-        if (adSec >= 180 && dna.retention < 50) {
-            weaknesses.push(`Pression pub élevée (<strong>${adSec}s/h</strong>) risquant d'éroder la rétention`);
-        }
-        if (durHours > 4.5 && avgV < maxV * 0.55) {
-            weaknesses.push(`Essoufflement de fin de session sur un live long (<strong>${durHours.toFixed(1)}h</strong>)`);
-        }
-        if (dna.reach <= 30 && uniques < 30) {
-            weaknesses.push(`Portée globale faible (<strong>${uniques}</strong> spectateurs uniques)`);
-        }
-        if (weaknesses.length === 0) {
-            weaknesses.push("Aucune anomalie majeure constatée sur cette session");
-        }
+        try {
+            const streamMinutes = parseFloat(s["Minutes passées en stream"]) || 0;
+            const streamHours = (streamMinutes / 60).toFixed(1);
+            const avgV = parseFloat(s["Spectateurs en moyenne"]) || 0;
+            const maxV = parseFloat(s["Spectateurs max."]) || 0;
+            const uniques = parseFloat(s["Spectateurs uniques"]) || 0;
+            const msgs = parseFloat(s["Messages du chat"]) || 0;
+            const chatters = parseFloat(s["Personnes sur le chat"]) || 0;
+            const follows = parseFloat(s["Nouveaux followers"]) || 0;
+            const subs = (parseFloat(s["Abonnements payés au total"]) || 0) + (parseFloat(s["Abonnements Prime"]) || 0) + (parseFloat(streamAiCache[dateKey]?.subs || s["Abonnements offerts au total"]) || 0);
+            const rev = s._revTotal || 0;
+            const ret = uniques > 0 ? ((parseFloat(s["Minutes regardées"])||0) / uniques).toFixed(1) : "0";
+            const loyalty = (s._loyaltyRate || 0).toFixed(0);
+            const raids = (parseFloat(s["Spectateurs d'hébergements et de raids (%)"])||0).toFixed(1);
+            const adSec = parseFloat(s["Durée de publicité (en secondes) par heure"])||0;
 
-        // 4. Recommandation ciblée
-        if (retMin < 12 && uniques >= 35) {
-            advice = "Structure le début du stream avec un objectif clair ou un hook immédiat pour fixer les visiteurs de passage dès les 3 premières minutes.";
-        } else if (chatParticipationPct < 15) {
-            advice = "Multiplie les questions ouvertes et les sondages pour inciter les spectateurs passifs (« lurkers ») à lâcher leur premier message.";
-        } else if (follows === 0 && uniques >= 40) {
-            advice = "Pense à placer 1 ou 2 rappels de follow naturels lors des moments forts du jeu ou lors d'un pic d'audience.";
-        } else if (peakRatio >= 1.7) {
-            advice = "Analyse le moment précis où le pic s'est produit pour le clipper et tenter de reproduire ce setup sur les prochains lives.";
-        } else if (globalScore >= 75) {
-            advice = "Live de référence : capitalise sur ce format, ce jeu et ce créneau horaire qui performent nettement au-dessus de ta moyenne.";
-        } else {
-            advice = "Maintiens cette régularité tout en travaillant le dynamisme des 20 premières minutes pour sécuriser l'audience entrante.";
-        }
+            // Benchmark des streams des 6 derniers mois
+            const sixMonthsAgo = new Date(s._date.getTime() - 180 * 24 * 3600 * 1000);
+            const refStreams = (window.db || []).filter(item => item._date >= sixMonthsAgo && item._date <= s._date && (item["Minutes passées en stream"] || 0) > 30);
+            const refCount = refStreams.length || 1;
+            const benchmark = {
+                avgViewers: (refStreams.reduce((a,b)=>a+(b["Spectateurs en moyenne"]||0),0)/refCount).toFixed(1),
+                maxViewers: (refStreams.reduce((a,b)=>a+(b["Spectateurs max."]||0),0)/refCount).toFixed(1),
+                uniques: (refStreams.reduce((a,b)=>a+(b["Spectateurs uniques"]||0),0)/refCount).toFixed(1),
+                retention: (refStreams.reduce((a,b)=>a+(b._stickiness||0),0)/refCount).toFixed(1),
+                loyalty: (refStreams.reduce((a,b)=>a+(b._loyaltyRate||0),0)/refCount).toFixed(0),
+                chatPerUnique: (refStreams.reduce((a,b)=>a+(b._chatMessagesPerUnique||0),0)/refCount).toFixed(2),
+                follows: (refStreams.reduce((a,b)=>a+(b["Nouveaux followers"]||0),0)/refCount).toFixed(1),
+                revPerHour: (refStreams.reduce((a,b)=>a+(b._hourlyEarnings||0),0)/refCount).toFixed(2)
+            };
 
-        return {
-            summary,
-            strengths: strengths.slice(0, 3),
-            weaknesses: weaknesses.slice(0, 3),
-            advice
-        };
+            const prompt = `
+Tu es l'analyste de stream Twitch de Plutonh. Analyse le stream suivant en le confrontant rigoureusement à ses moyennes habituelles (sur 6 mois) :
+
+LIVE SÉLECTIONNÉ (${s._date.toLocaleDateString('fr-FR')}) :
+- Note globale estimée : ${s._streamScore || 50}/100
+- Durée : ${streamHours}h
+- Viewers moyens : ${avgV.toFixed(1)} (Pic max : ${maxV})
+- Viewers uniques : ${uniques}
+- Rétention moyenne : ${ret} min/viewer
+- Taux de fidélité habitués : ${loyalty}%
+- Activité chat : ${msgs} msgs postés par ${chatters} chatters distincts (${uniques > 0 ? (msgs/uniques).toFixed(2) : 0} msgs/unique)
+- Nouveaux followers : +${follows}
+- Subs gagnés : +${subs}
+- Raids & hosts reçus : ${raids}%
+- Revenus totaux : ${rev.toFixed(2)}$
+- Publicité diffusée : ${adSec}s/h
+
+MOYENNES HABITUELLES (SUR LES 6 DERNIERS MOIS) :
+- Viewers moyens : ${benchmark.avgViewers} | Pic : ${benchmark.maxViewers}
+- Viewers uniques : ${benchmark.uniques}
+- Rétention : ${benchmark.retention} min/viewer
+- Fidélité habitués : ${benchmark.loyalty}%
+- Volume chat par unique : ${benchmark.chatPerUnique} msgs/unique
+- Followers par stream : +${benchmark.follows}
+- Revenus horaires : ${benchmark.revPerHour}$/h
+
+CONSIGNE : Réponds STRICTEMENT et UNIQUEMENT avec ce format HTML compact (aucun markdown, aucune balise code, que ce HTML) :
+<div style="color:#f0f0f8; font-size:0.78rem; line-height:1.4; margin-bottom:6px;"><strong>Synthèse :</strong> [1 phrase percutante résumant la dynamique du live par rapport aux habitudes]</div>
+<div style="font-size:0.74rem; color:#d8d8e5; line-height:1.35; margin-bottom:4px;"><strong style="color:var(--accent-green);">▲ FORCES :</strong> [2 ou 3 points forts précis avec chiffres et ratios marquants séparés par •]</div>
+<div style="font-size:0.74rem; color:#d8d8e5; line-height:1.35; margin-bottom:4px;"><strong style="color:var(--accent-red);">▼ LIMITES :</strong> [2 ou 3 axes d'amélioration ou freins observés séparés par •]</div>
+<div style="font-size:0.73rem; color:var(--accent-cyan); font-style:italic;">💡 <strong>Conseil :</strong> [1 action concrète à appliquer pour les prochains lives]</div>
+            `;
+
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0.55 }
+                })
+            });
+
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => ({}));
+                throw new Error(errJson.error?.message || `Erreur HTTP ${res.status}`);
+            }
+
+            const data = await res.json();
+            const cleanText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+                .replace(/^```html\s*/i, '')
+                .replace(/```\s*$/i, '') || "Analyse indisponible.";
+
+            streamAiCache[dateKey] = cleanText;
+            if (container) container.innerHTML = cleanText;
+
+        } catch (err) {
+            console.error("Erreur audit stream :", err);
+            if (container) container.innerHTML = `<span style="color:var(--accent-red)">Erreur : ${err.message}</span>`;
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = "🔄 RÉANALYSER";
+            }
+        }
     }
 
     function renderStreamDNA(stream) {
@@ -1297,7 +1314,6 @@
         const globalScore = dnaData.globalScore;
         const category = classifyStream(dna);
         const cat = DNA_CATEGORIES[category];
-        const narrative = generateStreamNarrative(stream, dnaData);
 
         const axes = [
             { key: 'retention', label: 'Rétention', icon: '⏱', color: '#00e5ff' },
@@ -1320,37 +1336,37 @@
                                 globalScore >= 50 ? "STREAM SOLIDE" : 
                                 globalScore >= 35 ? "STREAM CALME" : "STREAM CREUX";
 
+        const dateKey = stream.Date || stream._date.toISOString().slice(0,10);
+        const cachedAnalysis = streamAiCache[dateKey];
+
         document.getElementById('dnaInsight').innerHTML = `
-            <div style="display:flex; align-items:center; gap:16px; margin-bottom:12px;">
-                <div style="width:68px; height:68px; border-radius:50%; border:2px solid ${scoreColor}80; background:${scoreColor}14; display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0; box-shadow: 0 0 15px ${scoreColor}33;">
-                    <span style="font-size:1.45rem; font-weight:900; color:${scoreColor}; font-family:'Orbitron';">${globalScore}</span>
-                    <span style="font-size:0.5rem; color:var(--text-dim); letter-spacing:1px;">/100</span>
-                </div>
-                <div>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:0.75rem; font-weight:800; color:${scoreColor}; font-family:'Orbitron';">${scoreAppreciation}</span>
-                        <span style="color:var(--text-dim); font-size:0.75rem;">•</span>
-                        <span style="font-size:0.85rem; font-weight:700; color:${cat.color};">${cat.icon} ${cat.label}</span>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <div style="width:62px; height:62px; border-radius:50%; border:2px solid ${scoreColor}80; background:${scoreColor}14; display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0; box-shadow: 0 0 15px ${scoreColor}33;">
+                        <span style="font-size:1.35rem; font-weight:900; color:${scoreColor}; font-family:'Orbitron';">${globalScore}</span>
+                        <span style="font-size:0.48rem; color:var(--text-dim); letter-spacing:1px;">/100</span>
                     </div>
-                    <div style="font-size:0.77rem; color:#d0d0d8; line-height:1.35; margin-top:4px;">
-                        ${narrative.summary}
+                    <div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:0.74rem; font-weight:800; color:${scoreColor}; font-family:'Orbitron';">${scoreAppreciation}</span>
+                            <span style="color:var(--text-dim); font-size:0.75rem;">•</span>
+                            <span style="font-size:0.8rem; font-weight:700; color:${cat.color};">${cat.icon} ${cat.label}</span>
+                        </div>
+                        <span style="font-size:0.68rem; color:var(--text-dim);">Analyse approfondie assistée par Gemini</span>
                     </div>
                 </div>
+                <button id="btnStreamAi" class="dna-ai-btn" onclick="callGeminiStreamAudit()">
+                    ${cachedAnalysis ? '🔄 RÉANALYSER' : '✨ ANALYSER CE STREAM'}
+                </button>
             </div>
 
-            <!-- Bloc Modulaire : Points Forts & Points Faibles -->
-            <div style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; font-size: 0.72rem; display: flex; flex-direction: column; gap: 5px;">
-                <div style="display:flex; gap:6px; align-items:flex-start;">
-                    <span style="color:var(--accent-green); font-weight:bold; flex-shrink:0;">▲ FORCES :</span>
-                    <span style="color:#d5d5e2;">${narrative.strengths.join(' • ')}</span>
-                </div>
-                <div style="display:flex; gap:6px; align-items:flex-start;">
-                    <span style="color:var(--accent-red); font-weight:bold; flex-shrink:0;">▼ LIMITES :</span>
-                    <span style="color:#b5b5c4;">${narrative.weaknesses.join(' • ')}</span>
-                </div>
-                <div style="border-top:1px solid rgba(255,255,255,0.06); padding-top:4px; margin-top:2px; color:var(--accent-cyan); font-style:italic;">
-                    💡 <strong>Conseil :</strong> ${narrative.advice}
-                </div>
+            <!-- Bloc Modulaire Dynamique Gemini -->
+            <div id="streamAiContent" style="background: rgba(0,0,0,0.38); border: 1px solid rgba(0, 229, 255, 0.18); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; min-height: 80px; display: flex; flex-direction: column; justify-content: center;">
+                ${cachedAnalysis ? cachedAnalysis : `
+                    <div style="display:flex; align-items:center; justify-content:space-between; color:var(--text-dim); font-size:0.75rem;">
+                        <span>Cliquez sur <strong>« ANALYSER CE STREAM »</strong> pour générer la synthèse complète de cette session.</span>
+                    </div>
+                `}
             </div>
 
             <!-- Barres de scores radar détaillées -->
@@ -1488,7 +1504,7 @@
     }
 
     // =========================================================================
-    // 🧠 AUDIT STRATÉGIQUE COMPLET AVEC GEMINI (FLUX COMPLET DU CSV)
+    // 🧠 AUDIT STRATÉGIQUE GLOBAL GEMINI (FLUX COMPLET DU CSV)
     // =========================================================================
     async function callGeminiAI() {
         const btn = document.getElementById('geminiBtn');
